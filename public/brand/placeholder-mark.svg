@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- TEMPORARY stand-in mark. Replace with the real IP Ventures file and
+       update `brand.logo` in content/site.ts. -->
+  <rect width="64" height="64" rx="2" fill="#141414"/>
+  <path d="M16 18h6v28h-6zM28 18h12a9 9 0 0 1 0 18h-6v10h-6zm6 6v6h6a3 3 0 0 0 0-6z" fill="#F4F1EA"/>
+</svg>

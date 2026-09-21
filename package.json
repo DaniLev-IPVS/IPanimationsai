@@ -1,7 +1,7 @@
 {
-  "name": "ipventures",
+  "name": "ip-animations-ai",
   "version": "1.0.0",
-  "description": "IP Ventures - A global creative studio building IP-native brands",
+  "description": "IP Ventures animations \u2014 animation that makes people move",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
