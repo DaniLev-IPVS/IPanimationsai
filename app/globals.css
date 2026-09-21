@@ -582,18 +582,6 @@ textarea.control:focus-visible,
   max-width: 20ch;
 }
 
-.placeholder-note {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  line-height: 1.5;
-  margin-top: 1.4rem;
-  padding: 0.6rem 0.8rem;
-  border-left: 3px solid var(--accent);
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
-  color: var(--ink-soft);
-  max-width: 54ch;
-}
 
 .quotes {
   margin-top: clamp(3rem, 8vh, 6rem);
@@ -605,7 +593,7 @@ textarea.control:focus-visible,
 .quote {
   /* `ch` here would resolve against the body font-size, not the quote's —
      that collapses the column. The measure lives on .quote__body. */
-  max-width: 30rem;
+  max-width: 34rem;
   position: relative;
 }
 
@@ -623,12 +611,16 @@ textarea.control:focus-visible,
 }
 
 .quote__body {
-  font-size: clamp(1.35rem, 2.5vw, 2.05rem);
+  font-size: clamp(1.1rem, 1.85vw, 1.55rem);
   font-weight: 600;
-  line-height: 1.24;
-  letter-spacing: -0.02em;
-  max-width: 24ch;
+  line-height: 1.34;
+  letter-spacing: -0.015em;
+  max-width: 34ch;
   text-wrap: pretty;
+}
+
+.quote__body p + p {
+  margin-top: 0.85em;
 }
 
 .quote:nth-child(even) .quote__body {
@@ -642,10 +634,23 @@ textarea.control:focus-visible,
 }
 
 .quote__work {
+  /* own line — inline it butted straight against the attribution */
   display: block;
-  opacity: 0.6;
+  width: fit-content;
+  margin-top: 0.5rem;
   text-transform: none;
   letter-spacing: 0.06em;
+  color: var(--accent);
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
+.quote__work:hover {
+  color: var(--ink);
+}
+
+.quote:nth-child(even) .quote__work {
+  margin-left: auto;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -678,8 +683,8 @@ textarea.control:focus-visible,
 .reel__wall {
   margin-top: clamp(1.5rem, 4vh, 3rem);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: clamp(1rem, 2.5vw, 2rem);
+  grid-template-columns: repeat(5, 1fr);
+  gap: clamp(0.7rem, 1.6vw, 1.2rem);
 }
 
 .reel__closer {
@@ -691,6 +696,12 @@ textarea.control:focus-visible,
   text-wrap: pretty;
 }
 
+@media (max-width: 1040px) {
+  .reel__wall {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 860px) {
   .reel__features {
     grid-template-columns: 1fr;
@@ -698,6 +709,12 @@ textarea.control:focus-visible,
   .reel__wall {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* the "see the work" anchors would otherwise land under the sticky header */
+.reel__features > div,
+.reel__wall > div {
+  scroll-margin-top: 7rem;
 }
 
 .card__frame {
@@ -734,26 +751,54 @@ textarea.control:focus-visible,
   color: color-mix(in srgb, var(--bone) 72%, transparent);
 }
 
-/* an empty slot still moves — a static box is a bad advert for an animator */
-.slot {
+/* click-to-play facade: poster now, iframe only once someone clicks */
+.card__play {
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.9rem;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: block;
 }
 
-.slot__art {
-  width: 44%;
-  max-width: 96px;
-  opacity: 0.9;
+.card__play img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
-.slot__id {
-  color: color-mix(in srgb, var(--bone) 42%, transparent);
-  font-size: 0.6rem;
-  text-align: center;
-  padding-inline: 0.5rem;
+.card__playmark {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  transition: transform 220ms ease;
+}
+
+.card__playmark svg {
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bone) 88%, transparent);
+  padding: 0.9rem;
+  width: 3.4rem;
+  height: 3.4rem;
+  box-sizing: content-box;
+}
+
+.card__play:hover .card__playmark,
+.card__play:focus-visible .card__playmark {
+  transform: scale(1.08);
+}
+
+.card__play:focus-visible {
+  outline: 2px solid var(--acid);
+  outline-offset: 3px;
+}
+
+.card__tag {
+  opacity: 0.6;
 }
