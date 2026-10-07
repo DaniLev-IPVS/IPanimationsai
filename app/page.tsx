@@ -1,19 +1,20 @@
-import Stage from "@/components/Stage";
-import { Header, Footer } from "@/components/Chrome";
-import { Hero, Testimonials, Reel, Closing } from "@/components/Sections";
+import { Header, StickyCta, Footer } from "@/components/Chrome";
+import { Hero, Ticker, Testimonials, WorkAndAbout } from "@/components/Sections";
+import Character from "@/components/character/Character";
 
 export default function Home() {
   return (
     <>
-      <Stage />
       <Header />
-      <main>
+      <main id="main">
         <Hero />
+        <Ticker />
         <Testimonials />
-        <Reel />
-        <Closing />
+        <WorkAndAbout />
       </main>
       <Footer />
+      <StickyCta />
+      <Character />
     </>
   );
 }

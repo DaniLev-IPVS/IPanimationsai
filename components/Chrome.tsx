@@ -1,51 +1,91 @@
-import { brand } from "@/content/site";
+"use client";
 
-/**
- * The lockup: IP VENTURES big, "animations" small underneath, letterspaced out
- * until it optically spans the width of the word above. That tracking is what
- * makes a two-weight lockup look designed rather than merely stacked.
- */
-export function Wordmark({ size = 1, invert = false }: { size?: number; invert?: boolean }) {
-  return (
-    <span
-      className="wordmark"
-      style={{ ["--wm" as string]: size, color: invert ? "var(--bone)" : "var(--ink)" }}
-    >
-      <span className="wordmark__big">{brand.nameBig}</span>
-      <span className="wordmark__small">{brand.nameSmall}</span>
-    </span>
-  );
-}
+import { useEffect, useState } from "react";
+import { brand } from "@/content/site";
+import Logo from "./Logo";
 
 export function Header() {
   return (
-    <header className="chrome chrome--top">
-      <a href="#hero" aria-label="IP Ventures animations — home">
-        <Wordmark size={1} />
+    <header className="top">
+      <a href="#top" className="top__logo" aria-label={`${brand.name} — home`}>
+        <Logo variant="colour" animate />
       </a>
-      <nav className="chrome__nav">
-        <a href="#reel" className="label">
-          THE WORK
+      <nav className="top__nav">
+        <a href="#work" className="top__link">
+          Our work
         </a>
-        <a href="#start" className="label chrome__cta">
-          START
+        <a href="#quote" className="btn btn--sm">
+          {brand.book}
         </a>
       </nav>
     </header>
   );
 }
 
+/**
+ * Phone only: a bottom bar with the CTA that appears once the form has
+ * scrolled out of view, and hides while the keyboard is up.
+ */
+export function StickyCta() {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    const form = document.getElementById("quote");
+    if (!form) return;
+    let formVisible = true;
+    let keyboard = false;
+    const update = () => setShow(!formVisible && !keyboard);
+
+    const io = new IntersectionObserver(
+      ([e]) => {
+        formVisible = e.isIntersecting;
+        update();
+      },
+      { threshold: 0.05 },
+    );
+    io.observe(form);
+
+    const vv = window.visualViewport;
+    const onVV = () => {
+      if (!vv) return;
+      keyboard = vv.height < window.innerHeight * 0.75;
+      update();
+    };
+    vv?.addEventListener("resize", onVV);
+    return () => {
+      io.disconnect();
+      vv?.removeEventListener("resize", onVV);
+    };
+  }, []);
+
+  return (
+    <div className={`stickycta ${show ? "is-on" : ""}`} aria-hidden={!show}>
+      <a href="#quote" className="btn btn--block" tabIndex={show ? 0 : -1}>
+        {brand.book}
+      </a>
+    </div>
+  );
+}
+
 export function Footer() {
   return (
-    <footer className="chrome chrome--bottom">
-      <Wordmark size={0.78} />
-      <div className="chrome__meta">
-        <a href={`mailto:${brand.email}`} className="label">
-          {brand.email}
+    <footer className="foot" id="footer">
+      {/* The landing zone: open ground he drops onto. */}
+      <div className="foot__sky" aria-hidden="true" />
+      <div className="foot__ground" id="footer-ground" data-platform aria-hidden="true" />
+      <div className="wrap foot__row">
+        <Logo variant="mono" className="foot__logo" />
+        <div className="foot__meta">
+          <a href={`mailto:${brand.email}`} className="foot__mail">
+            {brand.email}
+          </a>
+          <span className="foot__dim">
+            {brand.domain} · {brand.tagline}
+          </span>
+        </div>
+        <a href="#quote" className="btn btn--sm foot__cta" id="footer-cta">
+          {brand.book}
         </a>
-        <span className="label chrome__dim">
-          {brand.domain} · part of IP Ventures
-        </span>
       </div>
     </footer>
   );

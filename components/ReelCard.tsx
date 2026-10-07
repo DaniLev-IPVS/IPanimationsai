@@ -1,34 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReelItem } from "@/content/site";
 import { mediaUrl } from "@/lib/media";
 
 /**
- * A click-to-play facade rather than a live iframe.
+ * A click-to-play facade rather than a live player.
  *
- * Eleven YouTube embeds would each pull ~1MB of player before anyone pressed
- * anything. This ships a single poster image and only mounts the real iframe
- * once someone actually clicks.
+ * Ships one poster image; the real <video> or YouTube iframe only mounts
+ * when someone presses play. On devices with a real pointer, hovering starts
+ * a muted inline preview straight off R2.
  *
- * Items with an R2 `src` play as a native <video> straight off the bucket's
- * CDN. Items without one still use the YouTube embed, with posters from
- * YouTube's thumbnail CDN. Shorts have a true 1080x1920 frame at
- * `oardefault`, so vertical cards get a real vertical poster instead of a
- * cropped 16:9 one.
+ * Items with an R2 `src` play natively from the bucket's CDN. If R2 cannot be
+ * reached, pieces that also live on YouTube fall back to the embed.
  */
-export default function ReelCard({
-  item,
-  orientation,
-}: {
-  item: ReelItem;
-  orientation: "h" | "v";
-}) {
+export default function ReelCard({ item, orientation }: { item: ReelItem; orientation: "h" | "v" }) {
   const [playing, setPlaying] = useState(false);
+  const [preview, setPreview] = useState(false);
   const [posterFailed, setPosterFailed] = useState(false);
-  // If the R2 file cannot be reached (blocked DNS, VPN, outage), fall back to
-  // YouTube where the piece also lives there, instead of a dead player.
   const [r2Failed, setR2Failed] = useState(false);
+  const previewRef = useRef<HTMLVideoElement>(null);
 
   const yt = item.youtubeId;
   const videoSrc = r2Failed ? undefined : mediaUrl(item.src);
@@ -44,16 +35,18 @@ export default function ReelCard({
           : `https://i.ytimg.com/vi/${yt}/maxresdefault.jpg`
       : undefined);
 
-  // R2-only pieces have no YouTube backup. If R2 is not configured, show nothing
-  // rather than a dead card; if it is configured but unreachable, say so.
   const unavailable = !videoSrc && !yt;
   if (unavailable && !r2Failed) return null;
 
+  const canHover = typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
   return (
-    <figure className="card">
+    <figure className={`card card--${orientation}`} data-platform id={item.slug}>
       <div
         className="card__frame"
         style={{ aspectRatio: orientation === "v" ? "9 / 16" : "16 / 9" }}
+        onMouseEnter={() => canHover && videoSrc && !playing && setPreview(true)}
+        onMouseLeave={() => setPreview(false)}
       >
         {unavailable ? (
           <p className="card__fail">This video could not be loaded. Please try again later.</p>
@@ -79,7 +72,10 @@ export default function ReelCard({
           <button
             type="button"
             className="card__play"
-            onClick={() => setPlaying(true)}
+            onClick={() => {
+              setPreview(false);
+              setPlaying(true);
+            }}
             aria-label={`Play ${item.title}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -90,8 +86,22 @@ export default function ReelCard({
               decoding="async"
               onError={() => (r2Poster ? setR2Failed(true) : setPosterFailed(true))}
             />
+            {preview && videoSrc && (
+              <video
+                ref={previewRef}
+                className="card__preview"
+                src={videoSrc}
+                muted
+                loop
+                playsInline
+                autoPlay
+                preload="none"
+                aria-hidden="true"
+                onError={() => setPreview(false)}
+              />
+            )}
             <span className="card__playmark" aria-hidden="true">
-              <svg viewBox="0 0 48 48" width="34" height="34">
+              <svg viewBox="0 0 48 48" width="28" height="28">
                 <path d="M16 10 38 24 16 38z" fill="currentColor" />
               </svg>
             </span>
@@ -99,20 +109,20 @@ export default function ReelCard({
         )}
       </div>
 
-      {/* No title under the card: just the technique label, when there is one. */}
-      {(item.technique || item.tag) && (
-        <figcaption className="card__cap">
+      <figcaption className="card__cap">
+        <span className="card__title">{item.title}</span>
+        {(item.technique || item.tag) && (
           <span className="label card__tech">
-            {item.technique}
+            {item.technique === "HANDMADE" ? "Handmade" : item.technique === "AI" ? "AI" : ""}
             {item.tag && (
-              <span className="card__tag">
+              <>
                 {item.technique ? " · " : ""}
                 {item.tag}
-              </span>
+              </>
             )}
           </span>
-        </figcaption>
-      )}
+        )}
+      </figcaption>
     </figure>
   );
 }

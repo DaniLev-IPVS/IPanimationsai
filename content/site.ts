@@ -1,134 +1,164 @@
 /**
  * Single source of truth for every piece of copy, link and option on the page.
  * Change things here, not in the components.
+ *
+ * Anything marked TODO(daniel) is a placeholder waiting on a real value.
  */
 
 export const brand = {
-  nameBig: "IP VENTURES",
-  nameSmall: "animations",
+  name: "IP animations",
+  tagline: "The creative animation studio of IP Ventures",
   domain: "ipanimations.ai",
   email: "hello@ipanimations.ai",
-  // TEMPORARY placeholder mark. Drop the real IP Ventures file into
-  // public/brand/ and point this at it — nothing else needs to change.
-  logo: "/brand/placeholder-mark.svg",
-  logoIsPlaceholder: true,
+  /** The call to action everywhere except the form's own submit button. */
+  book: "Book with us",
+  /** From Branding/brand-kit. */
+  logo: {
+    colour: "/brand/ip-animations-colour-on-paper.svg",
+    monoInk: "/brand/ip-animations-mono-ink.svg",
+    monoPaper: "/brand/ip-animations-mono-paper.svg",
+    markInk: "/brand/mark-ink.svg",
+    markPaper: "/brand/mark-paper.svg",
+  },
 };
+
+/* ── 01 · Hero ──────────────────────────────────────────────────────────── */
 
 export const hero = {
-  label: "01 / 04 — THE OFFER",
-  headline: "Animation that makes people move.",
-  sub: "Frame by frame, rigged, or AI — we make the work people watch to the end and then act on. Click, follow, buy. Built by animators who were drawing long before the machines could.",
-  formLead: "Tell us what you need animated. You'll hear back within one business day.",
+  kicker: "Animation studio · IP Ventures",
+  /** Words wrapped in == == get the Sunbeam highlight. The dot is added by the component. */
+  headline: "Animated videos people actually ==finish==",
+  sub: "Explainers, trailers, intros, and ongoing social series with a character people come back for. Hand-drawn, rigged, or AI. Same team, same standard.",
+  offer: [
+    { title: "One-off videos", body: "Explainers, trailers, intros. Brief → storyboard → delivered film." },
+    { title: "Social series", body: "A character, a schedule, and clips built to grow a following." },
+    { title: "Any technique", body: "Frame by frame, rigged, or AI-assisted. We pick what fits the job and the budget." },
+  ],
+  trust: ["1M+ followers built", "300M+ views", "Wooshi World", "Ethermail", "Babysnek"],
+  formLead: "Tell us what you need. You'll hear back within one business day.",
+  cta: "Submit",
+  /**
+   * The sizzle loop, played on a vertical phone screen (9:16). `src`/`poster`
+   * are R2 keys. Until the real cut lands the screen plays a crossfade of the
+   * vertical reel posters instead (see Screen.tsx).
+   * v1 cut 2026-10-07: 16 shots, 22.8s, 720×1280. Shot list and recipe in
+   * scripts/sizzle-v1.edl.txt; re-cut and upload under a new key.
+   */
+  sizzle: {
+    src: "reel/sizzle-vertical.mp4" as string | undefined,
+    poster: "reel/sizzle-vertical.jpg",
+  },
 };
 
+export const ticker = [
+  "1M+ followers built",
+  "300M+ views",
+  "1,000+ animations",
+  "Frame by frame",
+  "Rigged",
+  "AI-assisted",
+  "Explainers",
+  "Trailers",
+  "Social series",
+  "Intros",
+  "Characters",
+];
+
 /* ── 02 · Testimonials ─────────────────────────────────────────────────────
-   Real client quotes, supplied 2026-09-21. `work` points at a reel item slug
-   so the quote can link to the thing it is about.
+   Real client quotes, supplied 2026-09-21, tightened 2026-10-07. Ellipses mark
+   removed words; nothing has been added. `work` points at a reel item slug.
    ──────────────────────────────────────────────────────────────────────── */
 
 export type Testimonial = {
-  /** One string per paragraph. */
-  quote: string[];
+  /** One short bold line: the result. Sits small, above the quote. */
+  result: string;
+  quote: string;
   attribution: string;
-  /** Slug of a reel item this quote is about, if there is one. */
   work?: string;
 };
 
 export const testimonials = {
-  label: "02 / 04 — WHAT THEY SAY AFTER",
-  lead: "Nobody hires an animation studio twice because the animation was pretty.",
   items: [
     {
-      quote: [
-        "We had the vision for the series but literally zero social presence. We needed to build a following before the release so we weren't launching into a void. IP Ventures took our character, Woo, and basically gave him a life on Instagram. We went from 0 to 150k+ followers in like 6 months… it was wild. The quality made us look legit from day one, which was huge for our partner conversations later on.",
-      ],
-      attribution: "Wooshi World Team",
+      result: "0 → 150k+ followers in six months",
+      quote:
+        "We had the vision for the series but literally zero social presence… IP Ventures took our character, Woo, and basically gave him a life on Instagram. We went from 0 to 150k+ followers in like 6 months… The quality made us look legit from day one.",
+      attribution: "Wooshi World team",
       work: "wooshi-intro-video",
     },
     {
-      quote: [
-        "Our tech is complicated. Explaining Web3 benefits to people who barely know what a wallet is… it's a nightmare.",
-        "We needed a video that made our features feel simple, not technical. [IP Ventures] …took the 'hard to understand' parts and made them click for our users. Honestly, it saved us so much time on onboarding because people finally just 'got it' without us having to write a novel.",
-      ],
+      result: "Web3 onboarding, explained in one video",
+      quote:
+        "Explaining Web3 benefits to people who barely know what a wallet is… it's a nightmare. [IP Ventures] took the 'hard to understand' parts and made them click for our users… people finally just 'got it' without us having to write a novel.",
       attribution: "Ethermail C-suite",
     },
     {
-      quote: [
-        "I basically started with version #1 and IP Ventures built out the rest. I had them do everything, redesigning the character, figuring out the personality, and writing the scripts that actually work for YouTube. It paid off big time. I've hit over 100M views across my socials now. If you want to actually go viral and not just make a pretty video, this is the team you hire.",
-      ],
+      result: "100M+ views across socials",
+      quote:
+        "I basically started with version #1 and IP Ventures built out the rest… redesigning the character, figuring out the personality, and writing the scripts that actually work for YouTube… I've hit over 100M views across my socials now. If you want to actually go viral and not just make a pretty video, this is the team you hire.",
       attribution: "Jessie, CEO of Babysnek",
       work: "no-bromance-babysnek",
     },
   ] as Testimonial[],
 };
 
-/* ── 03 · Reel ─────────────────────────────────────────────────────────────
-   Imported from the Webflow "Our Works" export, 2026-09-21. Order follows the
-   export's own Order column; the two AI pieces had no order and sit last.
+/* ── 03 · Work + about ─────────────────────────────────────────────────── */
 
-   `technique` uses the export's own two categories. The export does not
-   distinguish frame-by-frame from rigged inside "handmade" — say which is
-   which and the labels can get finer.
-   ──────────────────────────────────────────────────────────────────────── */
+export const about = {
+  body: "We're the creative animation studio of IP Ventures. Animators first: we were storyboarding and drawing long before the models could. Today we work frame by frame, rigged, or AI-assisted, and we pick the technique per job, not per trend. Everything is designed, directed and finished by people. Tell us what you need and the person who answers is the one who will make it.",
+  // Daniel, 2026-10-07: "probably 300M+ and/or 500M+ views, 1M+ followers, 1,000+ animations".
+  // 300M+ is the conservative figure; bump to 500M+ if you'd rather.
+  proof: [
+    { n: "300M+", l: "views" },
+    { n: "1M+", l: "followers built" },
+    { n: "1,000+", l: "animations made" },
+  ],
+  closer:
+    "The AI work isn't a prompt and a prayer. It's storyboarded, designed and directed like everything else here.",
+};
 
 export type Technique = "HANDMADE" | "AI";
 
 export type ReelItem = {
   slug: string;
   title: string;
-  /** YouTube id, if the piece also lives there. Optional: R2-only pieces have none. */
   youtubeId?: string;
-  /**
-   * R2 object key of the film, e.g. "reel/degen-future-trailer.mp4". When set
-   * (and NEXT_PUBLIC_MEDIA_BASE_URL is configured) the card plays this file
-   * from R2; otherwise it falls back to the YouTube embed.
-   */
+  /** R2 object key, e.g. "reel/degen-future-trailer.mp4". */
   src?: string;
-  /** R2 key of a poster still. Optional — falls back to the YouTube thumbnail. */
+  /** R2 key of a poster still. */
   poster?: string;
-  /** Left off until we say which it is — the card then shows no technique label. */
   technique?: Technique;
-  /** Extra tag from the export's Labels column, if any. */
   tag?: string;
+  /** Shown in the grid. Everything else stays here for the sizzle and future use. */
+  featured?: boolean;
 };
 
 export const reel = {
-  label: "03 / 04 — THE WORK",
-  lead: "Frame by frame. Rigged. AI. Same standard.",
-  closer:
-    "The AI work isn't a prompt and a prayer. It's storyboarded, designed and directed like everything else here — the model just replaces the in-between. That's why it doesn't look like everyone else's.",
-
   /** 16:9 — the films. */
   features: [
-    { slug: "degen-future-trailer", title: "Degen Future Trailer", youtubeId: "wShBHfbeQ-U", src: "reel/degen-future-trailer.mp4", poster: "reel/degen-future-trailer.jpg", technique: "HANDMADE" },
-    { slug: "3d-showreel", title: "3D Showreel", youtubeId: "IFyjA-mFyO4", src: "reel/3d-showreel.mp4", poster: "reel/3d-showreel.jpg", technique: "HANDMADE" },
-    { slug: "kabu-sunset-intro", title: "Kabu Sunset Intro", youtubeId: "jtMZKfgTUaA", src: "reel/kabu-sunset-intro.mp4", poster: "reel/kabu-sunset-intro.jpg", technique: "HANDMADE" },
-    { slug: "wooshi-intro-video", title: "Wooshi Intro Video", youtubeId: "Fltd--DgKHE", src: "reel/wooshi-intro-video.mp4", poster: "reel/wooshi-intro-video.jpg", technique: "HANDMADE" },
+    { slug: "wooshi-intro-video", title: "Wooshi Intro Video", youtubeId: "Fltd--DgKHE", src: "reel/wooshi-intro-video.mp4", poster: "reel/wooshi-intro-video.jpg", technique: "HANDMADE", featured: true },
+    { slug: "degen-future-trailer", title: "Degen Future Trailer", youtubeId: "wShBHfbeQ-U", src: "reel/degen-future-trailer.mp4", poster: "reel/degen-future-trailer.jpg", technique: "HANDMADE", featured: true },
+    { slug: "3d-showreel", title: "3D Showreel", youtubeId: "IFyjA-mFyO4", src: "reel/3d-showreel.mp4", poster: "reel/3d-showreel.jpg", technique: "HANDMADE", featured: true },
+    { slug: "kabu-sunset-intro", title: "Kabu Sunset Intro", youtubeId: "jtMZKfgTUaA", src: "reel/kabu-sunset-intro.mp4", poster: "reel/kabu-sunset-intro.jpg", technique: "HANDMADE", featured: true },
   ] as ReelItem[],
 
   /** 9:16 — the social cuts. */
   verticals: [
-    { slug: "barry-the-player", title: "Barry the Player", src: "reel/barry-the-player.mp4", poster: "reel/barry-the-player.jpg" },
+    { slug: "no-bromance-babysnek", title: "No Bromance | BabySnek", youtubeId: "LmW5kqDgOFY", src: "reel/no-bromance-babysnek.mp4", poster: "reel/no-bromance-babysnek.jpg", technique: "HANDMADE", tag: "Explainer", featured: true },
+    // TODO(daniel): confirm Barry and Bonk are AI pieces; then set technique: "AI".
+    { slug: "barry-the-player", title: "Barry the Player", src: "reel/barry-the-player.mp4", poster: "reel/barry-the-player.jpg", featured: true },
+    { slug: "bonk", title: "Bonk", src: "reel/bonk.mp4", poster: "reel/bonk.jpg", featured: true },
+    { slug: "needs-salt-babysnek", title: "Needs Salt | Babysnek", youtubeId: "bU6YVWnRBiI", src: "reel/needs-salt-babysnek.mp4", poster: "reel/needs-salt-babysnek.jpg", technique: "HANDMADE", featured: true },
     { slug: "laugh-too-hard-snek", title: "Laugh too Hard | Snek", youtubeId: "4kDYwB4-SOY", src: "reel/laugh-too-hard-snek.mp4", poster: "reel/laugh-too-hard-snek.jpg", technique: "HANDMADE" },
     { slug: "personal-time-ket", title: "Personal Time | Ket", youtubeId: "xiD_zdiwZgA", src: "reel/personal-time-ket.mp4", poster: "reel/personal-time-ket.jpg", technique: "HANDMADE" },
     { slug: "paycheck-babysnek", title: "Paycheck | Babysnek", youtubeId: "0GhHDqk6ZwY", src: "reel/paycheck-babysnek.mp4", poster: "reel/paycheck-babysnek.jpg", technique: "HANDMADE" },
     { slug: "barry-and-his-girl", title: "Barry and his Girl", src: "reel/barry-and-his-girl.mp4", poster: "reel/barry-and-his-girl.jpg" },
-    { slug: "no-bromance-babysnek", title: "No Bromance | BabySnek", youtubeId: "LmW5kqDgOFY", src: "reel/no-bromance-babysnek.mp4", poster: "reel/no-bromance-babysnek.jpg", technique: "HANDMADE", tag: "Explainer Video" },
-    { slug: "needs-salt-babysnek", title: "Needs Salt | Babysnek", youtubeId: "bU6YVWnRBiI", src: "reel/needs-salt-babysnek.mp4", poster: "reel/needs-salt-babysnek.jpg", technique: "HANDMADE" },
-    { slug: "bonk", title: "Bonk", src: "reel/bonk.mp4", poster: "reel/bonk.jpg" },
   ] as ReelItem[],
 };
 
-export const closing = {
-  label: "04 / 04 — START",
-  headline: "You've seen it. Now describe yours.",
-  sub: "Same questions. One business day.",
-};
-
-/* ── Form ──────────────────────────────────────────────────────────────────
-   These VALUES are the contract with Zapier. Renaming one silently breaks
-   lead capture — change them here and in the Zap together, never alone.
-   ────────────────────────────────────────────────────────────────────────── */
+/* ── Form options ──────────────────────────────────────────────────────────
+   These exact strings are the contract with the Zap. Do not edit.
+   ──────────────────────────────────────────────────────────────────────── */
 
 export const BUDGET_OPTIONS = [
   "$200 – $500",

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grandstander:wght@900&display=swap">
+<style>body{margin:0;background:transparent}a{color:#7B57F5}a:hover{color:#FFC629}</style>
+</helmet>
+<div style="position:absolute;inset:0;min-height:200px;display:flex;align-items:center;justify-content:center;padding:40px;box-sizing:border-box;background:{{ bg }}">
+<div style="display:flex;align-items:center;gap:.42em;font-size:{{ size }}px">
+<svg viewBox="128 56 434 297" style="height:1.65em;width:auto;display:block;overflow:visible"><g style="stroke-width:26;stroke-linejoin:round" fill="{{ ink }}" stroke="{{ ink }}"><path d="M383.819 81L345.736 162.287H230.638L268.721 81H383.819Z"></path><path d="M204.437 218.221H319.535L268.098 328H153L204.437 218.221Z"></path><path d="M537 162.287H421.902L383.819 81H498.917L537 162.287Z"></path><path d="M383.819 243.574H498.917L537 162.287H421.902L383.819 243.574Z"></path></g></svg>
+<div style="display:flex;align-items:baseline;gap:.22em;font:900 1em/1 Grandstander;letter-spacing:-.01em;color:{{ ink }}"><span>IP</span>{{ word }}</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;900px&quot;,&quot;height&quot;:&quot;320px&quot;},&quot;variant&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;wave&quot;,&quot;options&quot;:[&quot;wave&quot;,&quot;switch&quot;],&quot;tsType&quot;:&quot;'wave'|'switch'&quot;,&quot;section&quot;:&quot;Logo&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;dark&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;tsType&quot;:&quot;'dark'|'light'&quot;,&quot;section&quot;:&quot;Logo&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:64,&quot;min&quot;:24,&quot;max&quot;:200,&quot;step&quot;:2,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Logo&quot;},&quot;animate&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Logo&quot;},&quot;transparent&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Logo&quot;}}">
+class Component extends DCLogic {
+  r = { letters: [] };
+  anims = [];
+  componentDidMount() { this._rs = () => this.start(); window.addEventListener('resize', this._rs); this.start(); }
+  componentWillUnmount() { window.removeEventListener('resize', this._rs); this.stop(); }
+  componentDidUpdate() { clearTimeout(this._t); this._t = setTimeout(() => this.start(), 60); }
+  stop() { this.anims.forEach(a => a.cancel()); this.anims = []; }
+  start() {
+    this.stop();
+    (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => requestAnimationFrame(() => this.setup()));
+  }
+  setup() {
+    const r = this.r, animate = this.props.animate ?? true, variant = this.props.variant ?? 'wave';
+    if (!r.wrap || !r.ball) return;
+    const letters = r.letters.filter(el => el && el.isConnected);
+    const n = letters.length; if (n < 2) return;
+    const size = this.props.size ?? 64;
+    const ctx = this._ctx || (this._ctx = document.createElement('canvas').getContext('2d'));
+    ctx.font = `900 ${size}px Grandstander`;
+    const fm = ctx.measureText('x'), fa = fm.fontBoundingBoxAscent || size * .8, fd = fm.fontBoundingBoxDescent || size * .2;
+    const baseFromTop = (size - (fa + fd)) / 2 + fa, gap = size * .07;
+    const wr = r.wrap.getBoundingClientRect();
+    const xs = letters.map(l => { const b = l.getBoundingClientRect(); return b.left - wr.left + b.width / 2; });
+    const ys = letters.map(l => { const b = l.getBoundingClientRect(); const asc = ctx.measureText(l.textContent).actualBoundingBoxAscent || size * .5; return (b.top + baseFromTop - asc - gap) - (wr.top + wr.height); });
+    r.ball.style.transform = `translate(${xs[0]}px,${ys[0]}px)`;
+    if (!animate) return;
+    const seg = n, dur = seg * 380, hop = size * .62, kf = [];
+    xs.forEach((x, i) => {
+      kf.push({ offset: i / seg, transform: `translate(${x}px,${ys[i]}px) scale(1.3,.7)`, easing: 'cubic-bezier(.2,.6,.4,1)' });
+      const nx = i < n - 1 ? xs[i + 1] : xs[0], ny = i < n - 1 ? ys[i + 1] : ys[0], h = i < n - 1 ? hop : hop * 2.4;
+      kf.push({ offset: (i + .5) / seg, transform: `translate(${(x + nx) / 2}px,${Math.min(ys[i], ny) - h}px) scale(.9,1.12)`, easing: 'cubic-bezier(.6,0,.8,.4)' });
+    });
+    kf.push({ offset: 1, transform: `translate(${xs[0]}px,${ys[0]}px) scale(1.3,.7)` });
+    this.anims.push(r.ball.animate(kf, { duration: dur, iterations: Infinity }));
+    letters.forEach((l, i) => {
+      const inner = l.firstChild, t = i / seg, w = 1 / seg, f = [];
+      if (t > 0) f.push({ offset: 0, transform: 'none' });
+      if (t - w * .15 > 0) f.push({ offset: t - w * .15, transform: 'none' });
+      f.push({ offset: t, transform: 'scale(1.1,.9)' });
+      f.push({ offset: t + w * .5, transform: 'none' });
+      f.push({ offset: 1, transform: 'none' });
+      this.anims.push(inner.animate(f, { duration: dur, iterations: Infinity }));
+      if (variant === 'switch') {
+        const on = 'saturate(1) brightness(1)', off = 'saturate(.4) brightness(.6)', h = t / 2;
+        const cf = [{ offset: 0, filter: on, easing: 'steps(1,end)' }];
+        if (h > 0) cf.push({ offset: h, filter: on, easing: 'steps(1,end)' });
+        cf.push({ offset: h, filter: off, easing: 'steps(1,end)' }, { offset: .5 + h, filter: off, easing: 'steps(1,end)' }, { offset: .5 + h, filter: on, easing: 'steps(1,end)' }, { offset: 1, filter: on });
+        this.anims.push(inner.animate(cf, { duration: dur * 2, iterations: Infinity }));
+      }
+    });
+  }
+  renderVals() {
+    const H = React.createElement, theme = this.props.theme ?? 'dark', size = this.props.size ?? 64;
+    const dark = theme === 'dark';
+    const ink = dark ? '#FFF6EA' : '#1E1D22', bg = this.props.transparent ? 'transparent' : (dark ? '#2B2A31' : '#FFF6EA');
+    const cols = ['#FFC629', '#F23D8A', '#14C8A4', '#2F8CFF', '#FF7A1A', dark ? '#B79CFF' : '#7B57F5', '#FFC629', '#F23D8A', '#14C8A4', '#2F8CFF'];
+    const wave = [0, -.12, -.19, -.12, 0, .12, .19, .12, 0, -.12];
+    const r = this.r, b = size * .3;
+    const word = H('span', { ref: el => { r.wrap = el; }, style: { position: 'relative', display: 'inline-flex', alignItems: 'baseline' } },
+      [...'animations'].map((ch, i) => H('span', { key: i, ref: el => { r.letters[i] = el; }, style: { display: 'inline-block', color: cols[i], transform: `translateY(${wave[i]}em)` } },
+        H('span', { style: { display: 'inline-block', transformOrigin: '50% 85%' } }, ch))),
+      H('span', { key: 'ball', ref: el => { r.ball = el; }, style: { position: 'absolute', left: 0, bottom: 0, width: b, height: b, marginLeft: -b / 2, borderRadius: '50%', background: ink, transformOrigin: '50% 100%' } }));
+    return { ink, bg, size, word };
+  }
+}
+</script>
+</body>
+</html>

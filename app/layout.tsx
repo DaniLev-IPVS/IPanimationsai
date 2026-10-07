@@ -1,46 +1,48 @@
 import type { Metadata, Viewport } from "next";
-import { Archivo, IBM_Plex_Mono } from "next/font/google";
+import { Grandstander, Manrope } from "next/font/google";
 import "./globals.css";
 import { brand, hero } from "@/content/site";
 
-const display = Archivo({
+const display = Grandstander({
   subsets: ["latin"],
-  weight: ["400", "600", "800"],
+  weight: ["800", "900"],
   display: "swap",
   variable: "--font-display",
 });
 
-const mono = IBM_Plex_Mono({
+const text = Manrope({
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "600", "700"],
   display: "swap",
-  variable: "--font-mono",
+  variable: "--font-text",
 });
+
+const title = `${brand.name} — animated videos people actually finish`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(`https://${brand.domain}`),
-  title: "IP Ventures animations — animation that makes people move",
+  title,
   description: hero.sub,
+  icons: { icon: "/brand/favicon.svg", apple: "/brand/app-icon-charcoal.png" },
   openGraph: {
-    title: "IP Ventures animations",
+    title,
     description: hero.sub,
     url: `https://${brand.domain}`,
-    siteName: "IP Ventures animations",
+    siteName: brand.name,
     type: "website",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f4f1ea",
+  themeColor: "#FFF6EA",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${mono.variable}`}>
+    <html lang="en" className={`${display.variable} ${text.variable}`}>
       <body>{children}</body>
     </html>
   );

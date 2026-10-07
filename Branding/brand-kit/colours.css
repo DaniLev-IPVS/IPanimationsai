@@ -1,0 +1,9 @@
+:root{
+  --bg-dark:#2B2A31; --bg-light:#FFF6EA;
+  --ink:#1E1D22; --ink-soft:#4A4460; --line-light:#E6DCCB;
+  --paper:#FFF6EA; --paper-soft:#CFC8BC; --line-dark:#3A3940;
+  --grape:#7B57F5; --sunbeam:#FFC629;
+  /* logo only — never use in UI */
+  --logo-sunbeam:#FFC629; --logo-bubblegum:#F23D8A; --logo-mint:#14C8A4; --logo-sky:#2F8CFF; --logo-tangerine:#FF7A1A; --logo-grape:#7B57F5; --logo-grape-light:#B79CFF;
+  --font-display:'Grandstander',sans-serif; --font-text:'Manrope',sans-serif;
+}

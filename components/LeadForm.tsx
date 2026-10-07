@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import { BUDGET_OPTIONS, PURPOSE_OPTIONS } from "@/content/site";
+import { emit } from "@/lib/bus";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
+/**
+ * The one form on the page. Field names, option values and the /api/lead
+ * payload are the contract with the Zap: do not rename anything here.
+ */
 export default function LeadForm({
-  source,
-  cta = "Send it",
+  source = "hero",
+  cta = "Get a quote",
 }: {
-  source: "hero" | "closing";
+  source?: "hero" | "closing";
   cta?: string;
 }) {
   const [status, setStatus] = useState<Status>("idle");
@@ -45,6 +50,7 @@ export default function LeadForm({
         throw new Error(body?.error ?? "Something went wrong.");
       }
       setStatus("sent");
+      emit("lead:sent");
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -54,38 +60,45 @@ export default function LeadForm({
   if (status === "sent") {
     return (
       <div className="form form--done" role="status">
-        <p className="label">RECEIVED</p>
-        <p className="display-sm" style={{ marginTop: "0.6rem" }}>
-          Got it.
+        <p className="label">Received</p>
+        <p className="h2">
+          Got it<span className="dot" />
         </p>
-        <p className="lede" style={{ marginTop: "0.9rem" }}>
-          We&rsquo;ll call you within one business day. If it&rsquo;s urgent, the
-          fastest route is just to reply to the confirmation email.
+        <p className="body">
+          We&rsquo;ll call you within one business day. If it&rsquo;s urgent, reply to the
+          confirmation email and it jumps the queue.
         </p>
       </div>
     );
   }
 
   return (
-    <form className="form" onSubmit={onSubmit} noValidate={false}>
-      <Field label="Name" name="name" autoComplete="name" required />
-      <Field label="Email" name="email" type="email" autoComplete="email" required />
+    <form className="form" onSubmit={onSubmit}>
+      <Field label="Name" name="name" autoComplete="name" required enterKeyHint="next" />
+      <Field
+        label="Email"
+        name="email"
+        type="email"
+        autoComplete="email"
+        inputMode="email"
+        required
+        enterKeyHint="next"
+      />
       <Field
         label="Phone number"
         name="phone"
         type="tel"
         autoComplete="tel"
+        inputMode="tel"
         required
-        hint="Include your country code — we call, we don't just email."
+        enterKeyHint="next"
+        hint="With country code. We call, we don't just email."
       />
 
-      <Select label="Budget range" name="budget" options={[...BUDGET_OPTIONS]} required />
-      <Select
-        label="Animation needed for"
-        name="purpose"
-        options={[...PURPOSE_OPTIONS]}
-        required
-      />
+      <div className="form__row">
+        <Select label="Budget" name="budget" options={[...BUDGET_OPTIONS]} required />
+        <Select label="It's for" name="purpose" options={[...PURPOSE_OPTIONS]} required />
+      </div>
 
       <label className="field">
         <span className="label">
@@ -93,9 +106,10 @@ export default function LeadForm({
         </span>
         <textarea
           name="comment"
-          rows={3}
+          rows={2}
           className="control"
           placeholder="What are you making, and when do you need it?"
+          enterKeyHint="done"
         />
       </label>
 
@@ -105,13 +119,13 @@ export default function LeadForm({
         <input id={`cw-${source}`} name="company_website" tabIndex={-1} autoComplete="off" />
       </div>
 
-      <button className="btn" type="submit" disabled={status === "sending"}>
+      <button className="btn btn--block btn--lg" type="submit" disabled={status === "sending"}>
         {status === "sending" ? "Sending…" : cta}
       </button>
 
       {status === "error" && (
         <p className="form__error" role="alert">
-          {error} — or email us directly and we&rsquo;ll pick it up.
+          {error} If it keeps failing, email us and we&rsquo;ll pick it up.
         </p>
       )}
     </form>

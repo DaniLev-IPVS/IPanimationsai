@@ -1,0 +1,46 @@
+{
+  "backgrounds": {
+    "charcoal": "#2B2A31",
+    "paper": "#FFF6EA"
+  },
+  "brand": {
+    "grape": "#7B57F5",
+    "sunbeam": "#FFC629"
+  },
+  "text": {
+    "ink": "#1E1D22",
+    "inkSoft": "#4A4460",
+    "paper": "#FFF6EA",
+    "paperSoft": "#CFC8BC"
+  },
+  "lines": {
+    "onPaper": "#E6DCCB",
+    "onCharcoal": "#3A3940"
+  },
+  "logoOnly": {
+    "sunbeam": "#FFC629",
+    "bubblegum": "#F23D8A",
+    "mint": "#14C8A4",
+    "sky": "#2F8CFF",
+    "tangerine": "#FF7A1A",
+    "grape": "#7B57F5",
+    "grapeLightOnDark": "#B79CFF",
+    "letterOrder": "a:sunbeam n:bubblegum i:mint m:sky a:tangerine t:grape i:sunbeam o:bubblegum n:mint s:sky",
+    "waveEm": [
+      0,
+      -0.12,
+      -0.19,
+      -0.12,
+      0,
+      0.12,
+      0.19,
+      0.12,
+      0,
+      -0.12
+    ]
+  },
+  "fonts": {
+    "display": "Grandstander 800 (900 logo only)",
+    "text": "Manrope 400/600/700"
+  }
+}

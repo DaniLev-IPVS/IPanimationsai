@@ -1,24 +1,91 @@
-import { hero, testimonials, reel, closing } from "@/content/site";
+import { brand, hero, ticker, testimonials, reel, about } from "@/content/site";
 import LeadForm from "./LeadForm";
 import ReelCard from "./ReelCard";
+import Screen from "./Screen";
+
+/** "==word==" → highlighted word. The closing dot is added by the caller. */
+function Highlight({ text }: { text: string }) {
+  const parts = text.split(/(==[^=]+==)/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.startsWith("==") ? (
+          <mark key={i} className="hl">
+            {p.slice(2, -2)}
+          </mark>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
+  );
+}
 
 /* ── 01 · HERO ───────────────────────────────────────────────────────────── */
 
 export function Hero() {
   return (
-    <section id="hero" className="section section--tall">
-      <div className="wrap hero">
+    <section id="top" className="hero">
+      <div className="wrap hero__grid">
         <div className="hero__copy">
-          <p className="label">{hero.label}</p>
-          <h1 className="display hero__headline">{hero.headline}</h1>
-          <p className="lede hero__sub">{hero.sub}</p>
+          <p className="label hero__kicker">{hero.kicker}</p>
+          <h1 className="h1">
+            <Highlight text={hero.headline} />
+            <span className="dot" aria-hidden="true" />
+          </h1>
+          <p className="body hero__sub">{hero.sub}</p>
         </div>
-        <div className="hero__form">
-          <p className="lede hero__formlead">{hero.formLead}</p>
-          <LeadForm source="hero" cta="Start the reel" />
+
+        <ul className="offer">
+          {hero.offer.map((o) => (
+            <li key={o.title} className="offer__item">
+              <span className="offer__text">
+                <strong>{o.title}</strong>
+                {o.body}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="hero__form" id="quote">
+          <p className="body hero__formlead">{hero.formLead}</p>
+          <LeadForm source="hero" cta={hero.cta} />
+          <ul className="trust" aria-label="Clients and results">
+            {hero.trust.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        </div>
+
+        {/* The stage: the phone. The character's hole sits on the hero's ground
+            line at the right edge, positioned by the character engine. */}
+        <div className="stage" id="stage">
+          <Screen />
         </div>
       </div>
+      <div className="hole" id="hole" aria-hidden="true">
+        <span className="hole__rim" />
+      </div>
+      <div className="hero__ground" id="stage-ground" aria-hidden="true" />
     </section>
+  );
+}
+
+/* ── TICKER ──────────────────────────────────────────────────────────────── */
+
+export function Ticker() {
+  const items = [...ticker, ...ticker];
+  return (
+    <div className="ticker" aria-hidden="true" data-platform>
+      <div className="ticker__track">
+        {items.map((t, i) => (
+          <span key={i} className="ticker__item">
+            {t}
+            <span className="ticker__dot" />
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -26,27 +93,27 @@ export function Hero() {
 
 export function Testimonials() {
   return (
-    <section id="testimonials" className="section">
+    <section id="testimonials" className="section section--paper section--quotes">
       <div className="wrap">
-        <p className="label">{testimonials.label}</p>
-        <h2 className="display-sm quotes__lead">{testimonials.lead}</h2>
-
         <div className="quotes">
           {testimonials.items.map((t, i) => (
-            <figure className="quote" key={i}>
-              <span className="quote__mark" aria-hidden="true">
-                &ldquo;
-              </span>
-              <blockquote className="quote__body">
-                {t.quote.map((para, p) => (
-                  <p key={p}>{para}</p>
+            <figure className="quote" key={i} data-platform>
+              <div className="stars" aria-label="Five stars">
+                {Array.from({ length: 5 }).map((_, k) => (
+                  <svg key={k} viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+                    <path d="M10 1.6l2.6 5.4 5.9.8-4.3 4.1 1.1 5.9L10 15l-5.3 2.8 1.1-5.9L1.5 7.8l5.9-.8z" fill="currentColor" />
+                  </svg>
                 ))}
+              </div>
+              <p className="quote__result">{t.result}</p>
+              <blockquote className="quote__body">
+                <p>&ldquo;{t.quote}&rdquo;</p>
               </blockquote>
-              <figcaption className="quote__by label">
-                {t.attribution}
+              <figcaption className="quote__by">
+                <span className="label">{t.attribution}</span>
                 {t.work && (
                   <a className="quote__work" href={`#${t.work}`}>
-                    see the work ↓
+                    See the work ↓
                   </a>
                 )}
               </figcaption>
@@ -58,50 +125,44 @@ export function Testimonials() {
   );
 }
 
-/* ── 03 · REEL ───────────────────────────────────────────────────────────── */
+/* ── 03 · WORK + ABOUT ───────────────────────────────────────────────────── */
 
-export function Reel() {
+export function WorkAndAbout() {
+  const films = reel.features.filter((i) => i.featured);
+  const shorts = reel.verticals.filter((i) => i.featured);
   return (
-    <section id="reel" className="section reel">
+    <section id="work" className="section section--charcoal">
       <div className="wrap">
-        <p className="label reel__label">{reel.label}</p>
-        <h2 className="display-sm reel__lead">{reel.lead}</h2>
+        <div className="about" id="about" data-platform>
+          <div className="about__copy">
+            <p className="body about__body">{about.body}</p>
+          </div>
+          <ul className="proof">
+            {about.proof.map((p) => (
+              <li key={p.l}>
+                <span className="proof__n">{p.n}</span>
+                <span className="label proof__l">{p.l}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-        <div className="reel__features">
-          {reel.features.map((item) => (
-            <div key={item.slug} id={item.slug}>
-              <ReelCard item={item} orientation="h" />
-            </div>
+        <div className="grid grid--films">
+          {films.map((item) => (
+            <ReelCard key={item.slug} item={item} orientation="h" />
+          ))}
+        </div>
+        <div className="grid grid--shorts">
+          {shorts.map((item) => (
+            <ReelCard key={item.slug} item={item} orientation="v" />
           ))}
         </div>
 
-        <div className="reel__wall">
-          {reel.verticals.map((item) => (
-            <div key={item.slug} id={item.slug}>
-              <ReelCard item={item} orientation="v" />
-            </div>
-          ))}
-        </div>
-
-        <p className="reel__closer">{reel.closer}</p>
-      </div>
-    </section>
-  );
-}
-
-/* ── 04 · CLOSING ────────────────────────────────────────────────────────── */
-
-export function Closing() {
-  return (
-    <section id="closing" className="section section--tall">
-      <div className="wrap hero" id="start">
-        <div className="hero__copy">
-          <p className="label">{closing.label}</p>
-          <h2 className="display hero__headline">{closing.headline}</h2>
-          <p className="lede hero__sub">{closing.sub}</p>
-        </div>
-        <div className="hero__form">
-          <LeadForm source="closing" cta="Send it" />
+        <div className="work__end">
+          <p className="body work__closer">{about.closer}</p>
+          <a href="#quote" className="btn btn--lg">
+            {brand.book}
+          </a>
         </div>
       </div>
     </section>
