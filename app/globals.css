@@ -320,10 +320,28 @@ a {
   grid-template-columns: 1fr;
   grid-template-areas:
     "copy"
-    "form"
     "offer"
+    "form"
     "stage";
   gap: 1.5rem;
+}
+/* Phones: headline and sub centred, points left-aligned underneath, then the form. */
+.hero__copy {
+  text-align: center;
+}
+.hero__copy .h1 {
+  margin-left: auto;
+  margin-right: auto;
+}
+.hero__copy .hero__sub {
+  margin-left: auto;
+  margin-right: auto;
+}
+.offer {
+  max-width: 34rem;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
 }
 .stage {
   grid-area: stage;
@@ -1121,8 +1139,17 @@ textarea.control {
   .screen {
     width: 190px;
   }
+  .hero__copy {
+    text-align: left;
+  }
+  .hero__copy .h1,
+  .hero__copy .hero__sub {
+    margin-left: 0;
+    margin-right: 0;
+  }
   .offer {
-    margin-top: 0.25rem;
+    margin: 0.25rem 0 0;
+    max-width: none;
   }
   .h1 {
     max-width: 12ch;
