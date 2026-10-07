@@ -41,12 +41,14 @@ export const hero = {
    * The sizzle loop, played on a vertical phone screen (9:16). `src`/`poster`
    * are R2 keys. Until the real cut lands the screen plays a crossfade of the
    * vertical reel posters instead (see Screen.tsx).
-   * v1 cut 2026-10-07: 16 shots, 22.8s, 720×1280. Shot list and recipe in
-   * scripts/sizzle-v1.edl.txt; re-cut and upload under a new key.
+   * v2 cut 2026-10-07: 17 shots, 23.9s, 720×1280. Rank-1 pieces (Degen, No
+   * Bromance) appear most, rank-2 twice, rank-3 once; 16:9 films are stacked
+   * three high to fill the phone. Shot list and recipe in
+   * scripts/sizzle.edl.txt; re-cut and upload under a new key.
    */
   sizzle: {
-    src: "reel/sizzle-vertical.mp4" as string | undefined,
-    poster: "reel/sizzle-vertical.jpg",
+    src: "reel/sizzle-vertical-v2.mp4" as string | undefined,
+    poster: "reel/sizzle-vertical-v2.jpg",
   },
 };
 

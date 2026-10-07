@@ -1,0 +1,36 @@
+# Sizzle v2 (2026-10-07) — reel/sizzle-vertical-v2.mp4, 720x1280, 30fps, 23.9s, silent.
+# One shot per line: <R2 clip key> <start seconds> <duration seconds>.
+#
+# Weighting follows the original Webflow reel ranking: rank 1 (Degen Future
+# Trailer, No Bromance) four shots each, rank 2 (Wooshi, Laugh Too Hard) two,
+# rank 3 (3D Showreel, Personal Time) one, plus one each of Needs Salt, Barry
+# the Player and Bonk. 16:9 films are stacked three high (top/middle/bottom)
+# to fill the 9:16 frame; verticals are centre-cropped.
+#
+# Re-cut:
+#   while read clip ss dur; do
+#     if landscape: VF="scale=-2:428,crop=720:428,split=3[a][b][c];[a][b][c]vstack=3,crop=720:1280:0:2,fps=30,setsar=1,format=yuv420p"
+#     else:         VF="crop='min(iw,ih*9/16)':'min(ih,iw*16/9)',scale=720:1280,fps=30,setsar=1,format=yuv420p"
+#     ffmpeg -ss $ss -t $dur -i src/$clip.mp4 -filter_complex "$VF" -an -c:v libx264 -crf 20 seg/NN.mp4
+#   done < scripts/sizzle.edl.txt
+#   ffmpeg -f concat -safe 0 -i list.txt -c:v libx264 -preset slow -crf 25 -g 60 -movflags +faststart -an out.mp4
+#
+# Upload under a NEW key (R2 objects are immutable-cached), then point
+# content/site.ts hero.sizzle at it.
+no-bromance-babysnek 0.8 1.4
+degen-future-trailer 5.0 1.4
+laugh-too-hard-snek 0.5 1.4
+degen-future-trailer 7.6 1.4
+no-bromance-babysnek 2.4 1.4
+wooshi-intro-video 25.8 1.4
+bonk 1.9 1.4
+degen-future-trailer 15.2 1.4
+no-bromance-babysnek 6.3 1.3
+personal-time-ket 0.5 1.4
+3d-showreel 10.9 1.4
+needs-salt-babysnek 1.2 1.4
+no-bromance-babysnek 8.2 1.4
+wooshi-intro-video 47.0 1.4
+barry-the-player 8.6 1.5
+laugh-too-hard-snek 4.4 1.4
+degen-future-trailer 25.4 1.4
