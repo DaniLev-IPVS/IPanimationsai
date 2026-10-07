@@ -25,21 +25,21 @@ export const brand = {
 /* ── 01 · Hero ──────────────────────────────────────────────────────────── */
 
 export const hero = {
-  kicker: "Animation studio · IP Ventures",
   /** Words wrapped in == == get the Sunbeam highlight. The dot is added by the component. */
-  headline: "Animated videos people actually ==finish==",
-  sub: "Explainers, trailers, intros, and ongoing social series with a character people come back for. Hand-drawn, rigged, or AI. Same team, same standard.",
+  headline: "Animations people ==want==",
+  sub: "Made by animators. Built to get watched.",
   offer: [
-    { title: "One-off videos", body: "Explainers, trailers, intros. Brief → storyboard → delivered film." },
-    { title: "Social series", body: "A character, a schedule, and clips built to grow a following." },
-    { title: "Any technique", body: "Frame by frame, rigged, or AI-assisted. We pick what fits the job and the budget." },
+    { title: "One-off videos", body: "like explainers, trailers, intros." },
+    { title: "Social series:", body: "clips built to grow a following." },
+    { title: "Cutting edge technique:", body: "frame by frame, rigged, or AI-built." },
   ],
   trust: ["1M+ followers built", "300M+ views", "Wooshi World", "Ethermail", "Babysnek"],
   formLead: "Tell us what you need. You'll hear back within one business day.",
   cta: "Submit",
   /**
-   * The sizzle loop, played on a vertical phone screen (9:16). `src`/`poster`
-   * are R2 keys. Until the real cut lands the screen plays a crossfade of the
+   * The sizzle loop, played on a vertical phone screen (9:16) that sits beside
+   * the testimonials and switches itself on when it scrolls into view.
+   * `src`/`poster` are R2 keys. Until the real cut lands the screen plays a crossfade of the
    * vertical reel posters instead (see Screen.tsx).
    * v2 cut 2026-10-07: 17 shots, 23.9s, 720×1280. Rank-1 pieces (Degen, No
    * Bromance) appear most, rank-2 twice, rank-3 once; 16:9 films are stacked

@@ -28,7 +28,6 @@ export function Hero() {
     <section id="top" className="hero">
       <div className="wrap hero__grid">
         <div className="hero__copy">
-          <p className="label hero__kicker">{hero.kicker}</p>
           <h1 className="h1">
             <Highlight text={hero.headline} />
             <span className="dot" aria-hidden="true" />
@@ -57,12 +56,9 @@ export function Hero() {
           </ul>
         </div>
 
-        {/* The stage: the phone. The character's hole sits on the hero's ground
-            line at the right edge, positioned by the character engine. */}
-        <div className="stage" id="stage">
-          <Screen />
-        </div>
       </div>
+      {/* The character's hole sits on the hero's ground line at the right
+          edge, positioned by the character engine. */}
       <div className="hole" id="hole" aria-hidden="true">
         <span className="hole__rim" />
       </div>
@@ -94,7 +90,8 @@ export function Ticker() {
 export function Testimonials() {
   return (
     <section id="testimonials" className="section section--paper section--quotes">
-      <div className="wrap">
+      <div className="wrap quotes-row">
+        <Screen />
         <div className="quotes">
           {testimonials.items.map((t, i) => (
             <figure className="quote" key={i} data-platform>

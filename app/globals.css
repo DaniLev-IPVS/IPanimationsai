@@ -288,7 +288,7 @@ a {
 
 .hero {
   position: relative;
-  padding: 2rem 0 0;
+  padding: 2rem 0 2.25rem;
 }
 .hero__ground {
   position: absolute;
@@ -321,19 +321,16 @@ a {
   grid-template-areas:
     "copy"
     "form"
-    "offer"
-    "stage";
-  gap: 1.75rem;
+    "offer";
+  gap: 1.5rem;
 }
 .hero__copy {
   grid-area: copy;
 }
-.hero__kicker {
-  margin-bottom: 0.9rem;
-}
 .hero__sub {
-  margin-top: 1rem;
-  max-width: 44ch;
+  margin-top: 0.9rem;
+  max-width: 40ch;
+  font-size: 1.05rem;
 }
 .offer {
   grid-area: offer;
@@ -495,16 +492,8 @@ textarea.control {
   padding: 0.5rem 0;
 }
 
-/* ── the stage: a vertical phone on the ground line ───────────────────── */
+/* ── the phone (beside the testimonials) ──────────────────────────────── */
 
-.stage {
-  grid-area: stage;
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  justify-content: flex-start;
-  min-height: 0;
-}
 .screen {
   position: relative;
   z-index: 3;
@@ -604,33 +593,6 @@ textarea.control {
   color: var(--ink);
   font: 700 0.95rem var(--font-text), sans-serif;
 }
-/* The side button he presses. */
-.screen__switch {
-  position: absolute;
-  right: -7px;
-  top: 26%;
-  width: 7px;
-  height: 38px;
-  padding: 0;
-  border: 0;
-  border-radius: 0 4px 4px 0;
-  background: var(--ink);
-  cursor: default;
-  overflow: hidden;
-}
-.screen__switch span {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: var(--paper-soft);
-  opacity: 0.25;
-  transition: opacity 180ms var(--ease), background 180ms var(--ease);
-}
-.screen__switch.is-on span {
-  background: var(--sunbeam);
-  opacity: 1;
-}
-
 /* ── ticker ────────────────────────────────────────────────────────────── */
 
 .ticker {
@@ -703,6 +665,16 @@ textarea.control {
   padding-top: 2.5rem;
   padding-bottom: 3rem;
 }
+.quotes-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  justify-items: stretch;
+}
+.quotes-row .screen {
+  width: 200px;
+  justify-self: center;
+}
 .quotes {
   margin-top: 0;
 }
@@ -735,6 +707,7 @@ textarea.control {
   font-size: 1rem;
   line-height: 1.6;
   color: var(--ink);
+  max-width: 62ch;
 }
 .quote__by {
   display: flex;
@@ -1130,48 +1103,48 @@ textarea.control {
     --gutter: 40px;
   }
   .hero {
-    padding-top: 2.75rem;
-    min-height: calc(100svh - var(--top-h));
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
+    padding-top: 2.25rem;
+    padding-bottom: 2rem;
   }
   .hero__grid {
     grid-template-columns: minmax(0, 1fr) 420px;
-    grid-template-rows: auto auto 1fr;
+    grid-template-rows: auto 1fr;
     grid-template-areas:
       "copy form"
-      "offer form"
-      "stage form";
+      "offer form";
     column-gap: 3.5rem;
-    row-gap: 1.5rem;
+    row-gap: 1.75rem;
     align-items: start;
   }
   .offer {
     margin-top: 0.25rem;
   }
   .h1 {
-    max-width: 14.5ch;
+    max-width: 12ch;
+    font-size: clamp(2.6rem, 4.6vw, 4rem);
   }
   .hero__form {
-    padding: 1.5rem;
-    position: sticky;
-    top: calc(var(--top-h) + 16px);
+    padding: 1.35rem 1.5rem;
   }
   .hero__sub {
-    font-size: 1.08rem;
-  }
-  .stage {
-    align-self: end;
-    margin-top: auto;
-    padding-top: 1rem;
-  }
-  .screen {
-    width: 180px;
+    font-size: 1.15rem;
   }
   .hole {
     width: 62px;
     height: 18px;
+  }
+  .quotes-row {
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 2.5rem;
+    align-items: start;
+  }
+  .quotes-row .screen {
+    width: 250px;
+    position: sticky;
+    top: calc(var(--top-h) + 24px);
+  }
+  .quotes {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1180,7 +1153,11 @@ textarea.control {
     grid-template-columns: minmax(0, 1fr) 460px;
     column-gap: 5rem;
   }
-  .screen {
-    width: 200px;
+  .quotes-row {
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 3.5rem;
+  }
+  .quotes-row .screen {
+    width: 280px;
   }
 }

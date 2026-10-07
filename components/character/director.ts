@@ -13,9 +13,8 @@
 
 import { POSES, type Pose, mix, walkPose, clamp, lerp, easeInOut, easeOut } from "./rig";
 
+/** Somewhere he can stand: document y of the surface, viewport x of his feet. */
 export type Platform = { docY: number; x: number };
-/** A content box he can kick off on the way up: vertical range + right edge, document coords. */
-export type Wall = { top: number; bottom: number; right: number };
 
 export type Layout = {
   vw: number;
@@ -26,15 +25,16 @@ export type Layout = {
   laneX: number;          // viewport x of the fall lane
   standX: number;         // where he idles in the hero
   holeX: number;
-  switchX: number;        // viewport x of the screen switch
-  emergeX: number;        // where he walks in from
   heroGround: number;     // document y
   footerGround: number;   // document y
   footerX: number;        // where he lands
   workTop: number;        // document y where the page turns Charcoal
-  contentRight: number;   // viewport x of the content column's right edge
-  walls: Wall[];          // boxes near the lane he can kick off
-  platforms: Platform[];  // kept for reference; the climb now uses walls
+  /**
+   * The climb: a chain of real elements he jumps between on the way up,
+   * bottom → top, starting on the footer ground and ending at his spot by
+   * the hole. Built by Character.tsx from the page's cards, text and images.
+   */
+  footholds: Platform[];
 };
 
 export type Frame = {
@@ -52,7 +52,7 @@ export type Frame = {
 };
 
 type Mode = "down" | "up";
-type Intro = "waiting" | "walk" | "turn" | "reach" | "turn2" | "walk2" | "settle" | "done";
+type Intro = "waiting" | "walk" | "settle" | "done";
 
 const BLEND_MS = 260;
 
@@ -208,60 +208,30 @@ export class Director {
     const L = this.layout!;
     const gy = L.heroGround - scrollY;
     const t = now - this.introT0;
-    const walkMs = 700, turnMs = 220, reachMs = 650;
-    const nearSwitch = L.switchX + 40 * L.scale;
+    const from = L.vw + 40 * L.scale;
+    const dist = Math.max(1, from - L.standX);
+    const walkMs = clamp((dist / 300) * 1000, 500, 1800);
 
     if (this.intro === "walk") {
       const q = clamp(t / walkMs, 0, 1);
-      this.face = 1;
-      this.walkPhase += dt * 2.1;
-      const x = lerp(L.emergeX, nearSwitch + 26 * L.scale, easeOut(q));
-      const pose = q < 0.96 ? walkPose(this.walkPhase) : mix(walkPose(this.walkPhase), POSES.idle, (q - 0.96) / 0.04);
-      const f = this.base(x, gy, pose);
-      f.opacity = clamp(q * 5, 0, 1);
-      if (q >= 1) { this.intro = "turn"; this.introT0 = now; }
-      return f;
-    }
-    if (this.intro === "turn") {
-      const q = clamp(t / turnMs, 0, 1);
-      this.face = q < 0.5 ? 1 : -1;
-      const f = this.base(nearSwitch + 26 * L.scale, gy, mix(POSES.idle, POSES.look, Math.sin(q * Math.PI)));
-      if (q >= 1) { this.intro = "reach"; this.introT0 = now; }
-      return f;
-    }
-    if (this.intro === "reach") {
-      const q = clamp(t / reachMs, 0, 1);
       this.face = -1;
-      const reachAmt = Math.sin(q * Math.PI);
-      const x = lerp(nearSwitch + 26 * L.scale, nearSwitch, reachAmt);
-      if (q > 0.45 && !this.screenOn) this.fireScreen();
-      const f = this.base(x, gy, mix(POSES.idle, POSES.reach, reachAmt));
-      if (q >= 1) { this.intro = "turn2"; this.introT0 = now; }
-      return f;
-    }
-    if (this.intro === "turn2") {
-      const q = clamp(t / turnMs, 0, 1);
-      this.face = q < 0.5 ? -1 : 1;
-      const f = this.base(nearSwitch + 26 * L.scale, gy, mix(POSES.idle, POSES.look, Math.sin(q * Math.PI) * 0.6));
-      if (q >= 1) { this.intro = "walk2"; this.introT0 = now; this.walkFrom = nearSwitch + 26 * L.scale; }
-      return f;
-    }
-    if (this.intro === "walk2") {
-      const dist = Math.max(1, L.standX - this.walkFrom);
-      const ms = clamp((dist / 380) * 1000, 300, 2600);
-      const q = clamp(t / ms, 0, 1);
-      this.face = 1;
       this.walkPhase += dt * 2.1;
-      const x = lerp(this.walkFrom, L.standX, q < 0.9 ? q / 0.9 * 0.97 : 0.97 + easeOut((q - 0.9) / 0.1) * 0.03);
-      const pose = q < 0.94 ? walkPose(this.walkPhase) : mix(walkPose(this.walkPhase), POSES.idle, (q - 0.94) / 0.06);
-      const f = this.base(x, gy, pose);
+      const x = lerp(from, L.standX, q < 0.92 ? (q / 0.92) * 0.98 : 0.98 + easeOut((q - 0.92) / 0.08) * 0.02);
+      // Hop over the hole on the way past.
+      const near = clamp(1 - Math.abs(x - L.holeX) / (56 * L.scale), 0, 1);
+      const hop = Math.sin(near * Math.PI * 0.5) * 34 * L.scale;
+      let pose = walkPose(this.walkPhase);
+      if (near > 0) pose = mix(pose, POSES.leap, near * 0.8);
+      if (q > 0.94) pose = mix(pose, POSES.idle, (q - 0.94) / 0.06);
+      const f = this.base(x, gy - hop, pose);
+      f.shadow = near > 0 ? 1 - near : 1;
       if (q >= 1) { this.intro = "settle"; this.introT0 = now; }
       return f;
     }
-    // settle: turn to face the page
-    const q = clamp(t / turnMs, 0, 1);
-    this.face = q < 0.5 ? 1 : -1;
-    const f = this.base(L.standX, gy, mix(POSES.idle, POSES.look, Math.sin(q * Math.PI) * 0.5));
+    // settle: a glance back at the hole, then face the page
+    const q = clamp(t / 700, 0, 1);
+    this.face = q < 0.55 ? 1 : -1;
+    const f = this.base(L.standX, gy, mix(POSES.idle, POSES.look, Math.sin(q * Math.PI) * 0.7));
     if (q >= 1) { this.intro = "done"; this.face = -1; }
     return f;
   }
@@ -373,7 +343,7 @@ export class Director {
     return f;
   }
 
-  /* ── the climb: wall kicks up the lane ─────────────────────────────── */
+  /* ── the climb: a few big leaps between real elements ──────────────── */
 
   private climbFrame(now: number, scrollY: number, K: ReturnType<Director["key"]>): Frame {
     const L = this.layout!;
@@ -382,55 +352,41 @@ export class Director {
     // hugging the bottom edge all the way.
     const ease = clamp((K.sLand - scrollY) / (L.vh * 0.5), 0, 1);
     const pin = lerp(K.climbOffset, K.pinY + 70 * L.scale, easeInOut(ease));
-    const P = clamp(scrollY + pin, L.heroGround, L.footerGround);           // feet, document y
-    const hopH = 96 * L.scale + 44;                                          // document px per hop
-    const total = L.footerGround - L.heroGround;
-    const nHops = Math.max(1, Math.ceil(total / hopH));
-    const climbed = L.footerGround - P;
-    const idx = Math.min(nHops - 1, Math.floor(climbed / hopH));
-    const t = clamp((climbed - idx * hopH) / hopH, 0, 1);
+    const P = clamp(scrollY + pin, L.heroGround, L.footerGround); // feet, document y
 
-    // Walls at this height: the viewport edge on the right, the nearest
-    // content box (or the content column) on the left of the lane.
-    const xRight = L.vw - 22 * L.scale;
-    let edge = L.contentRight;
-    for (const w of L.walls) if (P >= w.top - 30 && P <= w.bottom + 30) edge = Math.max(edge, w.right);
-    let xLeft = edge + 26 * L.scale;
-    const single = xLeft > xRight - 36 * L.scale;          // no room: kick off one wall
-    if (single) xLeft = xRight - 46 * L.scale;
-
-    // Even hops go right→left, odd hops left→right. The very last hop lands
-    // on the hero ground at his spot by the hole.
-    const toLeft = idx % 2 === 0;
-    let xFrom = toLeft ? xRight : xLeft;
-    let xTo = toLeft ? xLeft : xRight;
-    const last = idx >= nHops - 1;
-    if (last) xTo = L.standX;
-    if (idx === 0) xFrom = L.footerX;
-
-    const x = lerp(xFrom, xTo, easeInOut(t));
-    const arc = Math.sin(t * Math.PI) * hopH * (single ? 0.25 : 0.4);
-    const docY = P - arc;
-    this.face = xTo - xFrom < 0 ? -1 : 1;
-    if (single) this.face = toLeft ? -1 : 1;
+    const chain = L.footholds; // bottom → top
+    let lower = chain[0], upper = chain[chain.length - 1];
+    for (let i = 0; i < chain.length - 1; i++) {
+      if (chain[i].docY >= P && chain[i + 1].docY <= P) { lower = chain[i]; upper = chain[i + 1]; break; }
+    }
+    const hop = Math.max(1, lower.docY - upper.docY);
+    const t = clamp((lower.docY - P) / hop, 0, 1);
+    const arcH = clamp(hop * 0.3, 40 * L.scale, L.vh * 0.4);
+    const docY = lerp(lower.docY, upper.docY, t) - Math.sin(t * Math.PI) * arcH;
+    const x = lerp(lower.x, upper.x, easeInOut(t));
+    const dx = upper.x - lower.x;
+    if (Math.abs(dx) > 6) this.climbFace = dx < 0 ? -1 : 1;
+    this.face = this.climbFace;
+    const last = upper.docY <= L.heroGround + 1;
 
     let pose: Pose;
-    if (t < 0.14) pose = mix(POSES.kick, POSES.leap, easeOut(t / 0.14));
-    else if (t < 0.8) pose = POSES.leap;
-    else pose = mix(POSES.leap, POSES.kick, easeInOut((t - 0.8) / 0.2));
-    if (last && t > 0.8) pose = mix(POSES.leap, POSES.idle, easeOut((t - 0.8) / 0.2));
+    if (t < 0.1) pose = mix(POSES.idle, POSES.crouch, easeInOut(t / 0.1));
+    else if (t < 0.24) pose = mix(POSES.crouch, POSES.leap, easeOut((t - 0.1) / 0.14));
+    else if (t < 0.82) pose = POSES.leap;
+    else if (t < 0.93) pose = mix(POSES.leap, POSES.crouch, easeInOut((t - 0.82) / 0.11));
+    else pose = mix(POSES.crouch, POSES.idle, easeOut((t - 0.93) / 0.07));
+    if (last && t >= 1) this.face = -1;
 
-    // Paused mid-climb: hover.
-    const still = now - this.lastMoveAt > 450 && !last;
+    // Paused mid-leap: hover.
+    const still = now - this.lastMoveAt > 450 && t > 0.1 && t < 0.9;
     if (still) {
       const bob = Math.sin(now / 700) * 5;
-      pose = mix(pose, POSES.hang, 0.8);
-      const f = this.base(x, docY - scrollY + bob, pose);
+      const f = this.base(x, docY - scrollY + bob, mix(pose, POSES.hang, 0.8));
       f.shadow = 0;
       return f;
     }
     const f = this.base(x, docY - scrollY, pose);
-    f.shadow = last && t > 0.9 ? 1 : 0;
+    f.shadow = t < 0.1 || t > 0.9 ? 1 : 0;
     return f;
   }
 
