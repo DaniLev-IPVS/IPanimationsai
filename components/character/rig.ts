@@ -46,6 +46,8 @@ export const POSES = {
   reach:    P({ tR: 8, kR: 6, tL: -6, kL: 4, aR: 96, eR: -4, aL: -14, eL: -14, lean: 8, head: 4 }),
   cheer:    P({ tR: 20, kR: 30, tL: -20, kL: 30, aR: 165, eR: 20, aL: 160, eL: -20, lean: -4, sx: 0.96, sy: 1.05, grounded: 0 }),
   hang:     P({ tR: 10, kR: 10, tL: -10, kL: 10, aR: 120, eR: 30, aL: 150, eL: 20, lean: 6, grounded: 0 }),
+  /** Head-first into the hole: body tipped forward, legs together, arms along the body. */
+  dive:     P({ tR: 6, kR: 6, tL: -4, kL: 6, aR: 168, eR: 6, aL: 174, eL: -6, lean: 62, head: 6, sx: 0.92, sy: 1.1, grounded: 0 }),
   /** Feet on a wall behind him, coiled, about to push off forward. */
   kick:     P({ tR: -55, kR: 110, tL: -70, kL: 120, aR: 40, eR: -40, aL: -30, eL: -30, lean: -18, head: 3, sx: 1.06, sy: 0.94, grounded: 0 }),
 } satisfies Record<string, Pose>;

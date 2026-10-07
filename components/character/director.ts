@@ -11,7 +11,7 @@
  * (card tops, headings, the ticker) back to the hero ground.
  */
 
-import { POSES, type Pose, mix, walkPose, clamp, lerp, easeInOut, easeOut } from "./rig";
+import { POSES, type Pose, mix, walkPose, clamp, lerp, easeInOut, easeOut, easeIn } from "./rig";
 
 /** Somewhere he can stand: document y of the surface, viewport x of his feet. */
 export type Platform = { docY: number; x: number };
@@ -80,6 +80,8 @@ export class Director {
   private climbFace: 1 | -1 = 1;
   private lastMoveAt = 0;
   private walkFrom = 0;
+  /** Scroll position he actually follows: the real one, low-passed so wheel steps read as motion. */
+  private s = NaN;
 
   /** Called by the component when the screen switch should fire. */
   onScreenOn: () => void = () => {};
@@ -111,9 +113,10 @@ export class Director {
 
   private key() {
     const L = this.layout!;
-    const pinY = clamp(L.vh * 0.42, 150, L.vh * 0.6);
+    // Where his feet hang while falling, measured from the top of the viewport.
+    const pinY = clamp(L.vh * 0.42, 150, L.vh * 0.6) + 70 * L.scale;
     const sPin = L.heroGround - pinY;
-    const jumpLen = clamp(L.vh * 0.28, 120, 320);
+    const jumpLen = clamp(L.vh * 0.34, 150, 380);
     const sJumpStart = sPin - jumpLen;
     // He lands when the footer ground reaches the pin line, or when the page
     // runs out of scroll, whichever comes first (the footer is short, so it is
@@ -128,16 +131,25 @@ export class Director {
     return { pinY, sPin, jumpLen, sJumpStart, sLand, landLen, sLandStart, climbOffset };
   }
 
-  update(now: number, scrollY: number): Frame | null {
+  update(now: number, realScroll: number): Frame | null {
     const L = this.layout;
     if (!L) return null;
     const dt = this.lastNow ? Math.min(0.05, (now - this.lastNow) / 1000) : 1 / 60;
     this.lastNow = now;
 
+    // Follow the real scroll through a short low-pass so a mouse wheel's
+    // discrete steps become continuous motion. Everything below works in the
+    // smoothed value; the final frame is shifted back so anything attached to
+    // the page (the ground lines) stays pixel-exact.
+    if (Number.isNaN(this.s)) this.s = realScroll;
+    this.s += (realScroll - this.s) * (1 - Math.exp(-dt * 13));
+    if (Math.abs(realScroll - this.s) < 0.25) this.s = realScroll;
+    const scrollY = this.s;
+
     // Velocity, smoothed. Direction flips only past a small threshold so a
     // trackpad jitter doesn't flip him mid-air.
-    const raw = dt > 0 ? (scrollY - this.lastScroll) / dt : 0;
-    this.lastScroll = scrollY;
+    const raw = dt > 0 ? (realScroll - this.lastScroll) / dt : 0;
+    this.lastScroll = realScroll;
     this.vel = lerp(this.vel, raw, 1 - Math.exp(-dt * 12));
     if (Math.abs(raw) > 20) this.lastMoveAt = now;
     const K = this.key();
@@ -158,6 +170,17 @@ export class Director {
     }
     if (scrollY > K.sJumpStart && !this.screenOn) this.fireScreen();
 
+    // Impact detection: crossed the landing point going down. Decided before
+    // the pose so the very first frame on the ground is already the landing.
+    const above = scrollY < K.sLand;
+    let thud = false;
+    if (this.wasAbove && !above && this.mode === "down" && !this.reduced) {
+      this.landedAt = now;
+      thud = true;
+    }
+    if (above && scrollY < K.sLandStart) this.landedAt = 0;
+    this.wasAbove = above;
+
     let f: Frame;
     if (this.reduced) f = this.reducedFrame(scrollY, K);
     else if (this.intro !== "done" && this.intro !== "waiting") f = this.introFrame(now, scrollY, dt);
@@ -168,14 +191,6 @@ export class Director {
     else if (scrollY < K.sLand) f = this.landApproach(scrollY, K);
     else f = this.bottomFrame(now, scrollY, K);
 
-    // Impact detection: crossed the landing point going down.
-    const above = scrollY < K.sLand;
-    if (this.wasAbove && !above && this.mode === "down" && !this.reduced) {
-      this.landedAt = now;
-      f.thud = true;
-    }
-    if (above && scrollY < K.sLandStart) this.landedAt = 0;
-    this.wasAbove = above;
 
     // Celebration overrides a grounded pose for 1.4s.
     if (this.celebrateT0 && now - this.celebrateT0 < 1400 && f.pose.grounded > 0.5) {
@@ -190,7 +205,9 @@ export class Director {
       f = { ...f, x: lerp(this.blendFrom.x, f.x, t), y: lerp(this.blendFrom.y, f.y, t), pose: mix(this.blendFrom.pose, f.pose, t) };
     } else this.blendFrom = null;
 
-    f.dark = scrollY + (f.y) > L.workTop;
+    // Back to real-scroll viewport space.
+    f = { ...f, y: f.y + (scrollY - realScroll) };
+    f.dark = realScroll + f.y > L.workTop;
     f.zFront = !L.behind;
     const airborne = scrollY > K.sPin && scrollY < K.sLand && this.intro === "done" && !this.reduced;
     f.paused = airborne && now - this.lastMoveAt > 450 && !f.thud;
@@ -258,17 +275,21 @@ export class Director {
     const q = clamp((scrollY - K.sJumpStart) / K.jumpLen, 0, 1);
     const gy = L.heroGround - scrollY;
     this.face = 1;
-    const arcH = clamp(L.vh * 0.09, 36, 80);
+    const arcH = clamp(L.vh * 0.085, 36, 74);
+
+    // Anticipation (0–0.22): sink into a crouch. Launch (0.22–0.4): spring
+    // into a stretched leap. Flight (0.4–1): arc over to the hole, tipping
+    // forward into a head-first dive that carries straight into the fall.
     let pose: Pose;
     if (q < 0.22) pose = mix(POSES.idle, POSES.crouch, easeInOut(q / 0.22));
     else if (q < 0.4) pose = mix(POSES.crouch, POSES.leap, easeOut((q - 0.22) / 0.18));
-    else if (q < 0.8) pose = mix(POSES.leap, POSES.fall, easeInOut((q - 0.4) / 0.4));
-    else pose = POSES.fall;
+    else pose = mix(POSES.leap, POSES.dive, easeInOut((q - 0.4) / 0.6));
+
     const travel = q < 0.22 ? 0 : easeInOut((q - 0.22) / 0.78);
     const x = lerp(L.standX, L.holeX, travel);
     const y = gy - Math.sin(travel * Math.PI) * arcH;
     const f = this.base(x, y, pose);
-    f.shadow = q < 0.22 ? 1 : 0;
+    f.shadow = q < 0.22 ? 1 : clamp(1 - travel * 2, 0, 1);
     return f;
   }
 
@@ -308,13 +329,14 @@ export class Director {
     const L = this.layout!;
     const q = clamp((scrollY - K.sLandStart) / K.landLen, 0, 1);
     const groundY = L.footerGround - scrollY;
-    const y = lerp(K.pinY + 70 * L.scale, groundY, easeInOut(q));
+    // Ease-in: he hangs, then the ground comes up fast.
+    const y = lerp(K.pinY, groundY, easeIn(q));
     const x = lerp(L.laneX, L.footerX, easeInOut(q));
-    const pose = q < 0.75 ? mix(POSES.fall, POSES.brace, easeInOut(q / 0.75)) : mix(POSES.brace, POSES.heroLand, easeOut((q - 0.75) / 0.25));
+    const pose = mix(POSES.fall, POSES.brace, easeInOut(clamp(q / 0.7, 0, 1)));
     this.face = 1;
     const f = this.base(x, y, pose);
-    f.shadow = clamp((q - 0.5) * 2, 0, 1) * 0.8;
-    f.speed = clamp(0.35 - q * 0.35, 0, 1);
+    f.shadow = clamp((q - 0.4) / 0.6, 0, 1) * 0.9;
+    f.speed = clamp(0.5 - q * 0.5, 0, 1);
     return f;
   }
 
@@ -324,20 +346,31 @@ export class Director {
     const since = this.landedAt ? now - this.landedAt : 99999;
     let pose: Pose;
     let burst = 0;
-    if (since < 520) { pose = POSES.heroLand; burst = since / 520; }
-    else if (since < 980) pose = mix(POSES.heroLand, POSES.rise, easeInOut((since - 520) / 460));
-    else if (since < 1300) pose = mix(POSES.rise, POSES.idle, easeOut((since - 980) / 320));
-    else if (since < 1650) pose = mix(POSES.idle, POSES.brushL, Math.sin(((since - 1300) / 350) * Math.PI));
-    else if (since < 2000) pose = mix(POSES.idle, POSES.brushR, Math.sin(((since - 1650) / 350) * Math.PI));
+    const HOLD = 1000;
+    if (since < HOLD) {
+      // Impact: a damped squash spring about the feet, then hold the pose
+      // dead still. The dust burst runs over the first 600ms.
+      const t = since / 1000;
+      const k = 0.3 * Math.exp(-t * 11) * Math.cos(t * 30);
+      pose = { ...POSES.heroLand, sx: POSES.heroLand.sx * (1 + k), sy: POSES.heroLand.sy * (1 - k) };
+      burst = clamp(since / 600, 0, 1);
+    } else if (since < HOLD + 650) {
+      // Head comes up first, then the body.
+      const t = easeInOut((since - HOLD) / 650);
+      pose = mix(POSES.heroLand, POSES.rise, t);
+      pose = { ...pose, head: lerp(POSES.heroLand.head, 0, Math.min(1, t * 1.8)) };
+    } else if (since < HOLD + 1050) pose = mix(POSES.rise, POSES.idle, easeOut((since - HOLD - 650) / 400));
+    else if (since < HOLD + 1450) pose = mix(POSES.idle, POSES.brushL, Math.sin(((since - HOLD - 1050) / 400) * Math.PI));
+    else if (since < HOLD + 1850) pose = mix(POSES.idle, POSES.brushR, Math.sin(((since - HOLD - 1450) / 400) * Math.PI));
     else {
       // Idle, with a point at the footer CTA every few seconds.
       const cyc = ((now / 1000) % 6) / 6;
       const pt = cyc > 0.7 ? Math.sin(((cyc - 0.7) / 0.3) * Math.PI) : 0;
-      pose = mix(mix(POSES.idle, POSES.look, Math.sin(now / 900) * 0.5 + 0.5 * 0.25), POSES.point, pt);
+      pose = mix(mix(POSES.idle, POSES.look, (Math.sin(now / 900) * 0.5 + 0.5) * 0.25), POSES.point, pt);
     }
     this.face = 1;
     const f = this.base(L.footerX, gy, pose);
-    f.burst = burst;
+    f.burst = burst > 0 && burst < 1 ? burst : 0;
     f.speed = 0;
     void K;
     return f;
@@ -351,7 +384,7 @@ export class Director {
     // half-viewport of upward scroll, so he climbs up the screen rather than
     // hugging the bottom edge all the way.
     const ease = clamp((K.sLand - scrollY) / (L.vh * 0.5), 0, 1);
-    const pin = lerp(K.climbOffset, K.pinY + 70 * L.scale, easeInOut(ease));
+    const pin = lerp(K.climbOffset, K.pinY, easeInOut(ease));
     const P = clamp(scrollY + pin, L.heroGround, L.footerGround); // feet, document y
 
     const chain = L.footholds; // bottom → top

@@ -133,6 +133,7 @@ export default function Character() {
     /* ── render loop ─────────────────────────────────────────────── */
     let raf = 0;
     let frames = 0, slow = 0, lastTick = 0;
+    let faceNow = -1; // animated facing: eases through 0 so a turn reads as a turn
     const pt = (p: [number, number]) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
 
     const draw = (now: number) => {
@@ -160,7 +161,11 @@ export default function Character() {
 
       const s = L.scale;
       const sk = solve(f.pose);
-      g.setAttribute("transform", `translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) scale(${(s * f.face * f.pose.sx).toFixed(3)} ${(s * f.pose.sy).toFixed(3)}) translate(-60 -${GROUND_Y})`);
+      const dtF = lastTick ? Math.min(0.05, (now - lastTick) / 1000) : 1 / 60;
+      faceNow += (f.face - faceNow) * (1 - Math.exp(-dtF * 16));
+      if (Math.abs(f.face - faceNow) < 0.01) faceNow = f.face;
+      const faceScale = Math.sign(faceNow || 1) * Math.max(0.08, Math.abs(faceNow));
+      g.setAttribute("transform", `translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) scale(${(s * faceScale * f.pose.sx).toFixed(3)} ${(s * f.pose.sy).toFixed(3)}) translate(-60 -${GROUND_Y})`);
       g.style.opacity = String(f.opacity);
       svg.classList.toggle("is-dark", f.dark);
 
