@@ -26,12 +26,14 @@ export default function ReelCard({
 }) {
   const [playing, setPlaying] = useState(false);
   const [posterFailed, setPosterFailed] = useState(false);
-
-  // R2 first; YouTube stays as the fallback until a piece has been uploaded.
-  const videoSrc = mediaUrl(item.src);
-  const r2Poster = mediaUrl(item.poster);
+  // If the R2 file cannot be reached (blocked DNS, VPN, outage), fall back to
+  // YouTube where the piece also lives there, instead of a dead player.
+  const [r2Failed, setR2Failed] = useState(false);
 
   const yt = item.youtubeId;
+  const videoSrc = r2Failed ? undefined : mediaUrl(item.src);
+  const r2Poster = r2Failed ? undefined : mediaUrl(item.poster);
+
   const poster =
     r2Poster ??
     (yt
@@ -42,9 +44,10 @@ export default function ReelCard({
           : `https://i.ytimg.com/vi/${yt}/maxresdefault.jpg`
       : undefined);
 
-  // R2-only pieces have no YouTube fallback: if R2 is not configured, show nothing
-  // rather than a dead card.
-  if (!videoSrc && !yt) return null;
+  // R2-only pieces have no YouTube backup. If R2 is not configured, show nothing
+  // rather than a dead card; if it is configured but unreachable, say so.
+  const unavailable = !videoSrc && !yt;
+  if (unavailable && !r2Failed) return null;
 
   return (
     <figure className="card">
@@ -52,7 +55,9 @@ export default function ReelCard({
         className="card__frame"
         style={{ aspectRatio: orientation === "v" ? "9 / 16" : "16 / 9" }}
       >
-        {playing && videoSrc ? (
+        {unavailable ? (
+          <p className="card__fail">This video could not be loaded. Please try again later.</p>
+        ) : playing && videoSrc ? (
           <video
             src={videoSrc}
             poster={r2Poster}
@@ -61,6 +66,7 @@ export default function ReelCard({
             playsInline
             preload="metadata"
             aria-label={item.title}
+            onError={() => setR2Failed(true)}
           />
         ) : playing ? (
           <iframe
@@ -82,7 +88,7 @@ export default function ReelCard({
               alt=""
               loading="lazy"
               decoding="async"
-              onError={() => setPosterFailed(true)}
+              onError={() => (r2Poster ? setR2Failed(true) : setPosterFailed(true))}
             />
             <span className="card__playmark" aria-hidden="true">
               <svg viewBox="0 0 48 48" width="34" height="34">
@@ -93,8 +99,9 @@ export default function ReelCard({
         )}
       </div>
 
-      <figcaption className="card__cap">
-        {(item.technique || item.tag) && (
+      {/* No title under the card: just the technique label, when there is one. */}
+      {(item.technique || item.tag) && (
+        <figcaption className="card__cap">
           <span className="label card__tech">
             {item.technique}
             {item.tag && (
@@ -104,9 +111,8 @@ export default function ReelCard({
               </span>
             )}
           </span>
-        )}
-        <span className="card__blurb">{item.title}</span>
-      </figcaption>
+        </figcaption>
+      )}
     </figure>
   );
 }
