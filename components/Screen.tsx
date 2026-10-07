@@ -6,8 +6,8 @@ import { mediaUrl } from "@/lib/media";
 import { on } from "@/lib/bus";
 
 /**
- * The phone beside the testimonials: a vertical 9:16 screen. Dark until it
- * scrolls into view (or "screen:on" fires), then plays the sizzle. Until the real
+ * The phone in the hero: a vertical 9:16 screen. Dark until it scrolls into
+ * view (or "screen:on" fires), then plays the sizzle. Until the real
  * cut exists it plays a crossfade of the vertical reel posters instead, so the
  * hero already behaves right.
  *
@@ -67,6 +67,31 @@ export default function Screen() {
       setBlocked(true);
     });
   }, [onAir, hasVideo, src]);
+
+  // If autoplay was refused, the first real interaction anywhere on the page
+  // counts as user activation: retry quietly, and only keep the tap button if
+  // that fails too.
+  useEffect(() => {
+    if (!blocked) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const retry = () => {
+      v.muted = true;
+      v.play()
+        .then(() => setBlocked(false))
+        .catch(() => {});
+    };
+    const evs: (keyof WindowEventMap)[] = ["pointerdown", "touchend", "keydown", "scroll"];
+    evs.forEach((e) => window.addEventListener(e, retry, { once: true, passive: true }));
+    const onVis = () => {
+      if (document.visibilityState === "visible") retry();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      evs.forEach((e) => window.removeEventListener(e, retry));
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [blocked]);
 
   return (
     <div className={`screen ${onAir ? "is-on" : ""}`} id="screen" aria-label="Showreel">

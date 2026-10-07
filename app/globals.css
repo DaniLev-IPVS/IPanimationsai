@@ -321,8 +321,15 @@ a {
   grid-template-areas:
     "copy"
     "form"
-    "offer";
+    "offer"
+    "stage";
   gap: 1.5rem;
+}
+.stage {
+  grid-area: stage;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-end;
 }
 .hero__copy {
   grid-area: copy;
@@ -492,7 +499,7 @@ textarea.control {
   padding: 0.5rem 0;
 }
 
-/* ── the phone (beside the testimonials) ──────────────────────────────── */
+/* ── the phone ────────────────────────────────────────────────────────── */
 
 .screen {
   position: relative;
@@ -664,16 +671,6 @@ textarea.control {
 .section--quotes {
   padding-top: 2.5rem;
   padding-bottom: 3rem;
-}
-.quotes-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1.5rem;
-  justify-items: stretch;
-}
-.quotes-row .screen {
-  width: 200px;
-  justify-self: center;
 }
 .quotes {
   margin-top: 0;
@@ -1108,13 +1105,21 @@ textarea.control {
   }
   .hero__grid {
     grid-template-columns: minmax(0, 1fr) 420px;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
     grid-template-areas:
       "copy form"
-      "offer form";
+      "offer form"
+      "stage form";
     column-gap: 3.5rem;
     row-gap: 1.75rem;
     align-items: start;
+  }
+  .stage {
+    align-self: end;
+    padding-top: 0.5rem;
+  }
+  .screen {
+    width: 190px;
   }
   .offer {
     margin-top: 0.25rem;
@@ -1133,19 +1138,6 @@ textarea.control {
     width: 62px;
     height: 18px;
   }
-  .quotes-row {
-    grid-template-columns: 250px minmax(0, 1fr);
-    gap: 2.5rem;
-    align-items: start;
-  }
-  .quotes-row .screen {
-    width: 250px;
-    position: sticky;
-    top: calc(var(--top-h) + 24px);
-  }
-  .quotes {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (min-width: 1280px) {
@@ -1153,11 +1145,7 @@ textarea.control {
     grid-template-columns: minmax(0, 1fr) 460px;
     column-gap: 5rem;
   }
-  .quotes-row {
-    grid-template-columns: 280px minmax(0, 1fr);
-    gap: 3.5rem;
-  }
-  .quotes-row .screen {
-    width: 280px;
+  .screen {
+    width: 200px;
   }
 }

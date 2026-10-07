@@ -37,8 +37,8 @@ export const hero = {
   formLead: "Tell us what you need. You'll hear back within one business day.",
   cta: "Submit",
   /**
-   * The sizzle loop, played on a vertical phone screen (9:16) that sits beside
-   * the testimonials and switches itself on when it scrolls into view.
+   * The sizzle loop, played on a vertical phone screen (9:16) in the hero that
+   * switches itself on when it scrolls into view.
    * `src`/`poster` are R2 keys. Until the real cut lands the screen plays a crossfade of the
    * vertical reel posters instead (see Screen.tsx).
    * v2 cut 2026-10-07: 17 shots, 23.9s, 720×1280. Rank-1 pieces (Degen, No

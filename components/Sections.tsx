@@ -56,6 +56,9 @@ export function Hero() {
           </ul>
         </div>
 
+        <div className="stage" id="stage">
+          <Screen />
+        </div>
       </div>
       {/* The character's hole sits on the hero's ground line at the right
           edge, positioned by the character engine. */}
@@ -90,8 +93,7 @@ export function Ticker() {
 export function Testimonials() {
   return (
     <section id="testimonials" className="section section--paper section--quotes">
-      <div className="wrap quotes-row">
-        <Screen />
+      <div className="wrap">
         <div className="quotes">
           {testimonials.items.map((t, i) => (
             <figure className="quote" key={i} data-platform>
