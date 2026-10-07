@@ -76,8 +76,18 @@ export type Technique = "HANDMADE" | "AI";
 export type ReelItem = {
   slug: string;
   title: string;
-  youtubeId: string;
-  technique: Technique;
+  /** YouTube id, if the piece also lives there. Optional: R2-only pieces have none. */
+  youtubeId?: string;
+  /**
+   * R2 object key of the film, e.g. "reel/degen-future-trailer.mp4". When set
+   * (and NEXT_PUBLIC_MEDIA_BASE_URL is configured) the card plays this file
+   * from R2; otherwise it falls back to the YouTube embed.
+   */
+  src?: string;
+  /** R2 key of a poster still. Optional — falls back to the YouTube thumbnail. */
+  poster?: string;
+  /** Left off until we say which it is — the card then shows no technique label. */
+  technique?: Technique;
   /** Extra tag from the export's Labels column, if any. */
   tag?: string;
 };
@@ -90,21 +100,22 @@ export const reel = {
 
   /** 16:9 — the films. */
   features: [
-    { slug: "degen-future-trailer", title: "Degen Future Trailer", youtubeId: "wShBHfbeQ-U", technique: "HANDMADE" },
-    { slug: "wooshi-intro-video", title: "Wooshi Intro Video", youtubeId: "Fltd--DgKHE", technique: "HANDMADE" },
-    { slug: "3d-showreel", title: "3D Showreel", youtubeId: "IFyjA-mFyO4", technique: "HANDMADE" },
-    { slug: "kabu-sunset-intro", title: "Kabu Sunset Intro", youtubeId: "jtMZKfgTUaA", technique: "HANDMADE" },
-    { slug: "the-greek-origin", title: "The Greek Origin", youtubeId: "dYE07MjtKWI", technique: "AI" },
-    { slug: "thumbelinas-reunion", title: "Thumbelina's Reunion", youtubeId: "50z0FHTWd34", technique: "AI" },
+    { slug: "degen-future-trailer", title: "Degen Future Trailer", youtubeId: "wShBHfbeQ-U", src: "reel/degen-future-trailer.mp4", poster: "reel/degen-future-trailer.jpg", technique: "HANDMADE" },
+    { slug: "3d-showreel", title: "3D Showreel", youtubeId: "IFyjA-mFyO4", src: "reel/3d-showreel.mp4", poster: "reel/3d-showreel.jpg", technique: "HANDMADE" },
+    { slug: "kabu-sunset-intro", title: "Kabu Sunset Intro", youtubeId: "jtMZKfgTUaA", src: "reel/kabu-sunset-intro.mp4", poster: "reel/kabu-sunset-intro.jpg", technique: "HANDMADE" },
+    { slug: "wooshi-intro-video", title: "Wooshi Intro Video", youtubeId: "Fltd--DgKHE", src: "reel/wooshi-intro-video.mp4", poster: "reel/wooshi-intro-video.jpg", technique: "HANDMADE" },
   ] as ReelItem[],
 
   /** 9:16 — the social cuts. */
   verticals: [
-    { slug: "no-bromance-babysnek", title: "No Bromance | BabySnek", youtubeId: "LmW5kqDgOFY", technique: "HANDMADE", tag: "Explainer Video" },
-    { slug: "laugh-too-hard-snek", title: "Laugh too Hard | Snek", youtubeId: "4kDYwB4-SOY", technique: "HANDMADE" },
-    { slug: "personal-time-ket", title: "Personal Time | Ket", youtubeId: "xiD_zdiwZgA", technique: "HANDMADE" },
-    { slug: "needs-salt-babysnek", title: "Needs Salt | Babysnek", youtubeId: "bU6YVWnRBiI", technique: "HANDMADE" },
-    { slug: "paycheck-babysnek", title: "Paycheck | Babysnek", youtubeId: "0GhHDqk6ZwY", technique: "HANDMADE" },
+    { slug: "barry-the-player", title: "Barry the Player", src: "reel/barry-the-player.mp4", poster: "reel/barry-the-player.jpg" },
+    { slug: "laugh-too-hard-snek", title: "Laugh too Hard | Snek", youtubeId: "4kDYwB4-SOY", src: "reel/laugh-too-hard-snek.mp4", poster: "reel/laugh-too-hard-snek.jpg", technique: "HANDMADE" },
+    { slug: "personal-time-ket", title: "Personal Time | Ket", youtubeId: "xiD_zdiwZgA", src: "reel/personal-time-ket.mp4", poster: "reel/personal-time-ket.jpg", technique: "HANDMADE" },
+    { slug: "paycheck-babysnek", title: "Paycheck | Babysnek", youtubeId: "0GhHDqk6ZwY", src: "reel/paycheck-babysnek.mp4", poster: "reel/paycheck-babysnek.jpg", technique: "HANDMADE" },
+    { slug: "barry-and-his-girl", title: "Barry and his Girl", src: "reel/barry-and-his-girl.mp4", poster: "reel/barry-and-his-girl.jpg" },
+    { slug: "no-bromance-babysnek", title: "No Bromance | BabySnek", youtubeId: "LmW5kqDgOFY", src: "reel/no-bromance-babysnek.mp4", poster: "reel/no-bromance-babysnek.jpg", technique: "HANDMADE", tag: "Explainer Video" },
+    { slug: "needs-salt-babysnek", title: "Needs Salt | Babysnek", youtubeId: "bU6YVWnRBiI", src: "reel/needs-salt-babysnek.mp4", poster: "reel/needs-salt-babysnek.jpg", technique: "HANDMADE" },
+    { slug: "bonk", title: "Bonk", src: "reel/bonk.mp4", poster: "reel/bonk.jpg" },
   ] as ReelItem[],
 };
 

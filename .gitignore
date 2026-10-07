@@ -27,3 +27,7 @@ yarn-error.log*
 # links. THIS REPO IS PUBLIC — keep it local. Remove this line only if the repo
 # is made private first.
 doc.md
+
+# Source video masters live in R2 (data.ipanimations.ai), not in git. Drop new
+# work here, then `npm run media:upload`.
+/Videos\ of\ our\ work\ /

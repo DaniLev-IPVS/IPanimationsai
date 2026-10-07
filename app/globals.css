@@ -726,7 +726,8 @@ textarea.control:focus-visible,
   border: 1px solid color-mix(in srgb, var(--bone) 16%, transparent);
 }
 
-.card__frame iframe {
+.card__frame iframe,
+.card__frame video {
   position: absolute;
   inset: 0;
   width: 100%;

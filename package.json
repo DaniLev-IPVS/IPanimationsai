@@ -1,12 +1,13 @@
 {
   "name": "ip-animations-ai",
   "version": "1.0.0",
-  "description": "IP Ventures animations \u2014 animation that makes people move",
+  "description": "IP Ventures animations — animation that makes people move",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "media:upload": "node --env-file-if-exists=.env.local scripts/upload-to-r2.mjs"
   },
   "dependencies": {
     "next": "^14.0.0",
@@ -14,6 +15,8 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1147.0",
+    "@aws-sdk/lib-storage": "^3.1147.0",
     "@types/node": "^20.8.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
