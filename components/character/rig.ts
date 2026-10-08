@@ -12,7 +12,7 @@ export type Pose = {
   tL: number; kL: number; // far leg
   aR: number; eR: number; // near arm: shoulder angle, elbow (forearm = a + e)
   aL: number; eL: number; // far arm
-  lean: number;           // whole body rotation about the hip, + = forward
+  lean: number;           // whole body rotation about the hip; NOTE: positive tips the head BACK, negative forward
   head: number;           // head centre x offset (nod / look)
   sx: number; sy: number; // squash & stretch about the anchor
   grounded: number;       // 1 → feet pinned to the ground line
@@ -38,8 +38,9 @@ export const POSES = {
   fall:     P({ tR: 28, kR: 22, tL: -22, kL: 28, aR: 135, eR: 18, aL: 160, eL: 10, lean: 12, grounded: 0 }),
   flail:    P({ tR: 50, kR: 65, tL: -40, kL: 55, aR: 168, eR: -35, aL: 178, eL: 32, lean: 24, head: 3, grounded: 0 }),
   brace:    P({ tR: 18, kR: 32, tL: -12, kL: 26, aR: -55, eR: -20, aL: -65, eL: -20, lean: 10, grounded: 0 }),
-  heroLand: P({ tR: 92, kR: 132, tL: -28, kL: 100, aR: -52, eR: 0, aL: -125, eL: -30, lean: 52, head: 10, sx: 1.1, sy: 0.9 }),
-  rise:     P({ tR: 30, kR: 50, tL: -10, kL: 30, aR: -20, eR: -20, aL: -30, eL: -20, lean: 18, head: 2 }),
+  /** Superhero landing: a lunge. Front leg planted and bent, back knee on the floor, near hand to the ground, far arm up and back, head down. Leg/arm angles are pre-compensated for the forward lean. */
+  heroLand: P({ tR: 150, kR: 118, tL: 49, kL: 104, aR: 64, eR: 4, aL: -96, eL: -24, lean: -54, head: 14, sx: 1.1, sy: 0.9 }),
+  rise:     P({ tR: 70, kR: 80, tL: 14, kL: 40, aR: 26, eR: -24, aL: -60, eL: -24, lean: -16, head: 4 }),
   brushL:   P({ tR: 4, kR: 4, tL: -4, kL: 4, aR: 62, eR: -128, aL: -10, eL: -14, head: -2 }),
   brushR:   P({ tR: 4, kR: 4, tL: -4, kL: 4, aR: 48, eR: -118, aL: -12, eL: -14, head: 2 }),
   point:    P({ tR: 6, kR: 4, tL: -6, kL: 4, aR: 84, eR: 2, aL: -10, eL: -16, head: 3, lean: 3 }),
@@ -133,8 +134,8 @@ export function solve(p: Pose): Skeleton {
   const handL = tip(elbowL, p.aL + p.eL, FORE);
   const head: Pt = [HEAD[0] + p.head, HEAD[1]];
 
-  // Lean: rotate everything about the hip. Positive = tip forward (clockwise on screen
-  // for a right-facing figure).
+  // Lean: rotate everything about the hip. Positive tips the head backward
+  // (away from the facing side); use negative values to lean forward.
   const pts: Record<string, Pt> = { head, shoulder: SHOULDER, hip: HIP, kneeR, footR, kneeL, footL, elbowR, handR, elbowL, handL };
   if (p.lean) for (const k in pts) pts[k] = rot(pts[k], HIP, -p.lean);
 

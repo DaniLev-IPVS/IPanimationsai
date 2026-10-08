@@ -15,46 +15,82 @@ const P = (p: Partial<Pose>): Pose => ({
 });
 
 /* ── wall run ────────────────────────────────────────────────────────────
-   One hop from wall A (behind him) to wall B (ahead). He faces the direction
-   of travel the whole hop; the next hop flips facing, so the "plant" pose on
-   arrival and the "coil" pose at the start mirror each other with the feet
-   the same distance from the hips. That keeps the feet on the wall across
-   the flip.
+   One hop from wall A (behind him) to wall B (ahead), as a parkour stride:
+   a lead leg and a trail leg, the opposite arm forward. On the wall he is
+   scrunched with both feet planted; the push drives the lead leg straight
+   first, the trail leg follows; in flight he holds a running stride; the
+   lead foot reaches the next wall first and the trail leg swings in as he
+   scrunches again. The lead leg alternates every hop.
+
+   Poses below are written with the lead leg = R (near) and trail = L (far);
+   `swapSides` mirrors them for the other lead. The coil at the start and the
+   scrunch on arrival keep the feet at the hip column, so the feet stay on
+   the wall across the facing flip between hops.
    ─────────────────────────────────────────────────────────────────────── */
 
-/** Coiled on the wall behind: knees deep, feet on the wall just behind the hips, torso leaning out. */
-export const COIL: Pose = P({ tR: 32, kR: 118, tL: 24, kL: 112, aR: -34, eR: -36, aL: -46, eL: -30, lean: 28, head: 5, sx: 1.05, sy: 0.95 });
-/** Full push: both legs driven straight back into the wall, body stretched forward, arms swinging through. */
-export const PUSH: Pose = P({ tR: -42, kR: 4, tL: -34, kL: 8, aR: 34, eR: -10, aL: 10, eL: -14, lean: 40, head: 6, sx: 0.94, sy: 1.06 });
-/** Flight: legs trailing and loosening, arms low and back, chest forward. */
-export const FLY: Pose = P({ tR: -24, kR: 36, tL: -8, kL: 54, aR: -24, eR: -22, aL: -40, eL: -18, lean: 30, head: 5 });
-/** Legs swung forward to meet the wall feet first, torso rocking back to absorb. */
-export const REACH: Pose = P({ tR: 50, kR: 26, tL: 42, kL: 34, aR: 36, eR: -18, aL: 22, eL: -16, lean: -4, head: 3 });
-/** Planted on the wall ahead: feet forward on it, knees folding deep (mirror of COIL). */
-export const PLANT: Pose = P({ tR: 54, kR: 78, tL: 48, kL: 72, aR: 28, eR: -30, aL: 16, eL: -26, lean: -12, head: 2, sx: 1.05, sy: 0.95 });
+/** Scrunched on the wall: both feet planted just behind the hips, lead knee a little higher, opposite arm forward. */
+export const COIL: Pose = P({ tR: 38, kR: 122, tL: 26, kL: 110, aR: -42, eR: -30, aL: 32, eL: -44, lean: -26, head: 5, sx: 1.05, sy: 0.95 });
+/** First push: the lead leg driven straight back into the wall, trail leg still folded, arms mid-swing. */
+export const PUSH1: Pose = P({ tR: -40, kR: 4, tL: 30, kL: 108, aR: 6, eR: -14, aL: 2, eL: -20, lean: -36, head: 6, sx: 0.98, sy: 1.02 });
+/** Second push: both legs straight into the wall, body stretched, arms through to the stride. */
+export const PUSH2: Pose = P({ tR: -44, kR: 4, tL: -34, kL: 12, aR: 42, eR: -12, aL: -38, eL: -16, lean: -42, head: 6, sx: 0.94, sy: 1.06 });
+/** Flight: a running stride. Lead knee up and forward, trail leg back, lead-side arm back, other arm forward. */
+export const FLY: Pose = P({ tR: 56, kR: 96, tL: -40, kL: 62, aR: -40, eR: -28, aL: 52, eL: -52, lean: -22, head: 5 });
+/** Reaching the next wall: lead leg extends out to it, trail leg starts to come through, arms forward for balance. */
+export const REACH: Pose = P({ tR: 64, kR: 18, tL: -18, kL: 70, aR: 24, eR: -20, aL: 34, eL: -30, lean: -2, head: 3 });
+/** First contact: lead foot on the wall and folding, trail leg swinging in. */
+export const TOUCH: Pose = P({ tR: 56, kR: 84, tL: 22, kL: 62, aR: 20, eR: -32, aL: 12, eL: -30, lean: 6, head: 3, sx: 1.02, sy: 0.98 });
 /** Reaching up with both hands for the rim of the hole. */
-export const RIM_REACH: Pose = P({ tR: 10, kR: 30, tL: -4, kL: 36, aR: 172, eR: 4, aL: 166, eL: -4, lean: 6, head: 2 });
+export const RIM_REACH: Pose = P({ tR: 10, kR: 30, tL: -4, kL: 36, aR: 172, eR: 4, aL: 166, eL: -4, lean: -4, head: 2 });
 
-/**
- * Pose for a wall hop at progress t ∈ [0,1]. `toRim` for the last hop that
- * ends hanging from the hole: the arms go up instead of planting.
- */
-export function wallHopPose(t: number, toRim: boolean): Pose {
-  if (t < 0.14) return mix(COIL, PUSH, easeOut(t / 0.14));
-  if (t < 0.3) return mix(PUSH, FLY, easeInOut((t - 0.14) / 0.16));
-  if (toRim) {
-    if (t < 0.6) return FLY;
-    return mix(FLY, RIM_REACH, easeInOut((t - 0.6) / 0.4));
-  }
-  if (t < 0.6) return FLY;
-  if (t < 0.84) return mix(FLY, REACH, easeInOut((t - 0.6) / 0.24));
-  return mix(REACH, PLANT, easeIn((t - 0.84) / 0.16));
+/** Mirror a pose's sides: the far leg/arm become the near ones. */
+export function swapSides(p: Pose): Pose {
+  return { ...p, tR: p.tL, kR: p.kL, tL: p.tR, kL: p.kR, aR: p.aL, eR: p.eL, aL: p.aR, eL: p.eR };
+}
+/** Mirror a pose front-to-back in its own space: what was behind is now ahead. */
+export function mirrorFrontBack(p: Pose): Pose {
+  return { ...p, tR: -p.tR, tL: -p.tL, aR: -p.aR, aL: -p.aL, lean: -p.lean, head: -p.head };
 }
 
-/** Near-foot displacement forward of the hip column, in rig units, for the wall contact. */
-export function footForward(p: Pose): number {
+export type Lead = "R" | "L";
+
+/**
+ * Pose for a wall hop at progress t ∈ [0,1] with the given lead leg.
+ * `toRim` for the last hop that ends hanging from the hole.
+ */
+export function wallHopPose(t: number, toRim: boolean, lead: Lead = "R"): Pose {
+  const sw = lead === "L";
+  const S = (p: Pose) => (sw ? swapSides(p) : p);
+  const coil = S(COIL), push1 = S(PUSH1), push2 = S(PUSH2), fly = S(FLY), reach = S(REACH), touch = S(TOUCH);
+  // On arrival he scrunches against the wall ahead with the other leg set to
+  // lead: the next hop's coil, seen from this side (so feet ahead, on wall B).
+  const plant = mirrorFrontBack(sw ? COIL : swapSides(COIL));
+  if (t < 0.08) return coil;
+  if (t < 0.16) return mix(coil, push1, easeIn((t - 0.08) / 0.08));
+  if (t < 0.24) return mix(push1, push2, (t - 0.16) / 0.08);
+  if (t < 0.4) return mix(push2, fly, easeOut((t - 0.24) / 0.16));
+  if (toRim) {
+    if (t < 0.6) return fly;
+    return mix(fly, RIM_REACH, easeInOut((t - 0.6) / 0.4));
+  }
+  if (t < 0.6) return fly;
+  if (t < 0.8) return mix(fly, reach, easeInOut((t - 0.6) / 0.2));
+  if (t < 0.9) return mix(reach, touch, easeIn((t - 0.8) / 0.1));
+  return mix(touch, plant, easeOut((t - 0.9) / 0.1));
+}
+
+/** Forward displacement (rig units) of the foot that is on the wall: the rearmost foot while pushing, the foremost while landing. */
+export function contactFoot(p: Pose, phase: "push" | "land"): number {
   const sk = solve(p);
-  return Math.max(sk.footR[0], sk.footL[0]) - 60;
+  const r = sk.footR[0] - 60, l = sk.footL[0] - 60;
+  return phase === "push" ? Math.min(r, l) : Math.max(r, l);
+}
+export function footForward(p: Pose): number {
+  return contactFoot(p, "land");
+}
+/** The stance he arrives in, with the given lead for the hop just flown. */
+export function plantPose(lead: Lead): Pose {
+  return mirrorFrontBack(lead === "L" ? COIL : swapSides(COIL));
 }
 
 /* ── muscle-up ───────────────────────────────────────────────────────────

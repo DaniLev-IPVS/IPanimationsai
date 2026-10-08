@@ -12,7 +12,7 @@
  */
 
 import { POSES, type Pose, mix, walkPose, clamp, lerp, easeInOut, easeOut, easeIn } from "./rig";
-import { wallHopPose, footForward, muscleUpFrame, MUSCLE_STAND_START, COIL, PLANT } from "./moves";
+import { wallHopPose, contactFoot, plantPose, muscleUpFrame, MUSCLE_STAND_START, COIL, type Lead } from "./moves";
 
 /** Somewhere he can stand: document y of the surface, viewport x of his feet. */
 export type Platform = {
@@ -569,9 +569,9 @@ export class Director {
       return f;
     }
 
-    let lower = chain[0], upper = top;
+    let lower = chain[0], upper = top, hopIndex = 0;
     for (let i = 0; i < chain.length - 1; i++) {
-      if (chain[i].docY >= P && chain[i + 1].docY <= P) { lower = chain[i]; upper = chain[i + 1]; break; }
+      if (chain[i].docY >= P && chain[i + 1].docY <= P) { lower = chain[i]; upper = chain[i + 1]; hopIndex = i; break; }
     }
     const hop = Math.max(1, lower.docY - upper.docY);
     const t = clamp((lower.docY - P) / hop, 0, 1);
@@ -586,14 +586,17 @@ export class Director {
     let pose: Pose;
     let x: number;
     if (wallHop) {
-      // Wall run, from moves.ts: coil, push with the legs, fly, swing the legs
-      // forward, plant. The feet are kept on the walls at both ends.
-      pose = wallHopPose(t, !!upper.hang);
-      const xFrom = lower.wall ? lower.x - this.face * footForward(COIL) * sc : lower.x;
-      const xTo = upper.hang ? upper.x : upper.wall ? upper.x - this.face * footForward(PLANT) * sc : upper.x;
-      if (t < 0.14 && lower.wall) x = lower.x - this.face * footForward(pose) * sc; // feet stay on the wall through the push
-      else x = lerp(lower.x - this.face * footForward(wallHopPose(0.14, false)) * sc, xTo, (t - 0.14) / 0.86);
-      void xFrom;
+      // Wall run, from moves.ts: a parkour stride with the lead leg
+      // alternating each hop. The pushing foot stays on the wall through the
+      // push; the lead foot is on the next wall from first contact.
+      const lead: Lead = hopIndex % 2 === 0 ? "R" : "L";
+      pose = wallHopPose(t, !!upper.hang, lead);
+      const pushOffX = lower.wall ? lower.x - this.face * contactFoot(wallHopPose(0.24, false, lead), "push") * sc : lower.x;
+      const touchX = upper.hang ? upper.x : upper.wall ? upper.x - this.face * contactFoot(wallHopPose(0.84, false, lead), "land") * sc : upper.x;
+      if (t < 0.24 && lower.wall) x = lower.x - this.face * contactFoot(pose, "push") * sc;
+      else if (t > 0.84 && upper.wall && !upper.hang) x = upper.x - this.face * contactFoot(pose, "land") * sc;
+      else x = lerp(pushOffX, touchX, (t - 0.24) / 0.6);
+      void COIL; void plantPose;
     } else {
       x = lerp(lower.x, upper.x, easeInOut(t));
       if (t < 0.1) pose = mix(POSES.idle, POSES.crouch, easeInOut(t / 0.1));
