@@ -88,6 +88,7 @@ export class Director {
   private lastX = NaN;
   private groundY = 0;
   private submitX = NaN;
+  private phoneP = 0;
   /** The hop-and-point at the Submit button: start time, 0 = not playing. */
   private gestureT0 = 0;
   private gestureEnd = 0;
@@ -142,11 +143,12 @@ export class Director {
     return { pinY, sPin, jumpLen, sJumpStart, sLand, landLen, sLandStart, climbOffset };
   }
 
-  update(now: number, realScroll: number, groundY: number, submitX: number): Frame | null {
+  update(now: number, realScroll: number, groundY: number, submitX: number, phoneP: number): Frame | null {
     const L = this.layout;
     if (!L) return null;
     this.groundY = groundY;
     this.submitX = submitX;
+    this.phoneP = phoneP;
     const dt = this.lastNow ? Math.min(0.05, (now - this.lastNow) / 1000) : 1 / 60;
     this.lastNow = now;
 
@@ -234,16 +236,16 @@ export class Director {
 
   /* ── hero ─────────────────────────────────────────────────────────── */
 
-  private stageP(scrollY: number) {
-    const L = this.layout!;
-    return clamp((scrollY - L.stageStart) / Math.max(1, L.stageEnd - L.stageStart), 0, 1);
+  /** 0 while the form and points are up, 1 once the phone has fully risen. */
+  private stageP(_scrollY: number) {
+    return this.phoneP;
   }
 
   private introFrame(now: number, scrollY: number, dt: number): Frame {
     const L = this.layout!;
     const gy = this.groundY;
     // Landed mid-stage? Skip the walk-in.
-    if (this.stageP(scrollY) > 0.25) { this.intro = "done"; return this.heroIdle(now, scrollY, dt); }
+    if (this.stageP(scrollY) > 0.1) { this.intro = "done"; return this.heroIdle(now, scrollY, dt); }
     const t = now - this.introT0;
     const from = -40 * L.scale;
     const ms = clamp(((L.leftX - from) / 300) * 1000, 400, 1200);
@@ -291,8 +293,8 @@ export class Director {
     let pose: Pose;
     let lift = 0;
 
-    if (p < 0.3) {
-      // By the form: hop and point at Submit, again every few seconds.
+    if (p < 0.04) {
+      // Form and points phase: by the form, hop and point at Submit every few seconds.
       x = L.leftX;
       if (!this.gestureT0 || (now - this.gestureT0 > 3600 && stillFor > 400)) this.gestureT0 = now;
       const g = this.gesture(now - this.gestureT0, breathe);
@@ -306,7 +308,7 @@ export class Director {
     } else if (p < 0.9) {
       // Walking across as the phone takes the screen. Pause the scroll and he
       // stops, hops, and points back at the Submit button.
-      const t = easeInOut((p - 0.3) / 0.6);
+      const t = easeInOut((p - 0.04) / 0.86);
       x = lerp(L.leftX, L.standX, t);
       const dx = Number.isNaN(this.lastX) ? 0 : x - this.lastX;
       const moving = Math.abs(dx) > 0.2;

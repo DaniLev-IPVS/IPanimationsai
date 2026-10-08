@@ -52,10 +52,10 @@ export default function Character() {
       const laneX = behind ? (isMobile ? vw - 36 : vw - 64) : vw - gutter / 2;
       const contentRight = wrap ? wrap.right : vw - gutter;
       const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh);
-      // The ground line lives in the pinned stage, a little above the panel's
-      // bottom; its resting document y is the section's bottom minus that inset.
-      const pinR = document.querySelector(".hero-stage__pin")?.getBoundingClientRect();
-      const groundInset = pinR ? pinR.bottom - ground.top : ground.height;
+      // The ground line is the top of the band stuck to the bottom of the
+      // screen; its resting document y is the section's bottom minus the band.
+      const bandR = document.querySelector(".hero-band")?.getBoundingClientRect();
+      const groundInset = bandR ? bandR.bottom - ground.top : ground.height;
       const heroGround = stageR.bottom + sy - groundInset;
       const stageStart = stageR.top + sy - topH;
       const stageEnd = stageR.bottom + sy - vh;
@@ -126,11 +126,11 @@ export default function Character() {
           io.disconnect();
         }
       },
-      { threshold: 0.4 },
+      { threshold: 0.5 },
     );
-    // The intro starts once the pinned stage he walks along is mostly on screen.
-    const pinEl = document.querySelector(".hero-stage__pin");
-    if (pinEl) io.observe(pinEl);
+    // The intro starts once the band he stands on is on screen.
+    const bandEl = document.querySelector(".hero-band");
+    if (bandEl) io.observe(bandEl);
 
     const offLead = on("lead:sent", () => director.celebrate(performance.now()));
     const onMouse = (e: MouseEvent) => director.setMouse(e.clientX, e.clientY);
@@ -166,7 +166,9 @@ export default function Character() {
       const submitEl = document.querySelector(".hero__form .btn--lg");
       const sb = submitEl?.getBoundingClientRect();
       const submitX = sb ? sb.left + sb.width / 2 : NaN;
-      let f = director.update(now, window.scrollY, groundY, submitX);
+      const stageSec = document.getElementById("quote");
+      const phoneP = stageSec ? parseFloat(stageSec.style.getPropertyValue("--pv")) || 0 : 0;
+      let f = director.update(now, window.scrollY, groundY, submitX, phoneP);
       if (!f) return;
       const L = director.layout!;
       if (debugPose && POSES[debugPose]) {

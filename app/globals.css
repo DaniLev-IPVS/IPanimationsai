@@ -337,66 +337,31 @@ a {
   margin-right: 0.35em;
 }
 
-/* The pinned stage: form → phone → walk → hole, driven by --p/--pf/--pv. */
+/* The hero stage: flow content under a band stuck to the bottom of the screen. */
 .hero-stage {
-  --p: 0;
-  --pf: 0;
   --pv: 0;
-  /* the ground line sits this far above the panel's bottom edge */
-  --ground-offset: 64px;
+  --points-gap: 2.5rem;
+  --char-room: 108px;
+  --band-h: 44px;
   position: relative;
-  /* one pinned screen plus 1.4 screens of scroll budget */
-  height: calc((100svh - var(--top-h)) + 140svh);
   scroll-margin-top: var(--top-h);
 }
-.hero-stage__pin {
-  position: sticky;
-  top: var(--top-h);
-  height: calc(100svh - var(--top-h));
-  overflow: hidden;
-  z-index: 2;
+.hero-stage__flow {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  padding: 0 var(--gutter) var(--char-room);
 }
-.hero__ground {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: var(--ground-offset);
-  height: 2px;
-  background: var(--ink);
-  z-index: 6;
+.hero-stage__hold {
+  width: min(100%, 520px);
 }
-.hole {
-  position: absolute;
-  bottom: var(--ground-offset);
-  right: 24px;
-  width: 52px;
-  height: 9px;
-  border-radius: 52px 52px 0 0 / 9px 9px 0 0;
-  background: var(--charcoal);
-  z-index: 6;
-}
-.hole__rim {
-  position: absolute;
-  inset: -2px -2px 0;
-  border-radius: 56px 56px 0 0 / 11px 11px 0 0;
-  border: 2px solid var(--ink);
-  border-bottom: 0;
-}
-
-.hero-stage__lift {
-  position: absolute;
-  left: 50%;
-  top: 10px;
-  width: min(100% - 2 * var(--gutter), 460px);
-  --fs: 1;
-  transform: translate(-50%, calc(var(--pf) * -130%)) scale(calc(var(--fs) * (1 - var(--pf) * 0.08)));
-  transform-origin: 50% 0;
-  opacity: calc(1 - var(--pf));
-  z-index: 4;
-  will-change: transform, opacity;
-}
-/* The card is the dark object on the page: Charcoal with Paper text. */
+/* The card is the dark object on the page: Charcoal with Paper text. It holds
+   near the top for a stretch (the wrapper is taller than it), then scrolls on. */
 .hero__form {
+  position: sticky;
+  top: calc(var(--top-h) + 12px);
+  width: 100%;
   --bg: var(--charcoal);
   --fg: var(--paper);
   --fg-soft: var(--paper-soft);
@@ -455,17 +420,6 @@ a {
   font-weight: 600;
   margin-bottom: 1rem;
 }
-/* The three points under the card, with air on both sides. */
-.offer--stage {
-  margin: 1.1rem auto 0;
-  padding: 0 0.25rem;
-  max-width: 100%;
-  gap: 0.4rem;
-}
-.offer--stage .offer__item {
-  font-size: 0.88rem;
-  line-height: 1.4;
-}
 .trust {
   list-style: none;
   margin: 1.1rem 0 0;
@@ -490,23 +444,61 @@ a {
   background: var(--paper-soft);
 }
 
-/* The phone rises from behind the ground line, grows, and comes into focus. */
+/* The three points: a real gap below the card, then they scroll up from under the line. */
+.offer--stage {
+  width: min(100%, 520px);
+  margin: var(--points-gap) auto 0;
+  padding: 0 0.25rem;
+  gap: 0.5rem;
+}
+
+/* The phone rises from under the line, growing from 60% and coming into focus. */
 .stage {
-  position: absolute;
-  inset: 0 0 calc(var(--ground-offset) + var(--stage-gap, 96px));
+  width: 100%;
+  margin-top: 2rem;
   display: flex;
-  align-items: flex-end;
   justify-content: center;
-  pointer-events: none;
-  z-index: 3;
 }
 .stage .screen {
-  pointer-events: auto;
-  width: min(100% - 2 * var(--gutter), calc((100svh - var(--top-h) - var(--ground-offset) - var(--stage-gap, 96px) - 24px) * 0.5625), 380px);
-  transform: translateY(calc((1 - var(--pv)) * 110%)) scale(calc(0.6 + var(--pv) * 0.4));
+  width: min(100%, calc((100svh - var(--top-h) - var(--band-h) - var(--char-room) - 24px) * 0.5625), 380px);
+  transform: scale(calc(0.6 + var(--pv) * 0.4));
   transform-origin: 50% 100%;
   filter: blur(calc((1 - var(--pv)) * 10px)) brightness(calc(0.55 + var(--pv) * 0.45));
   will-change: transform, filter;
+}
+
+/* The band: ground line + banner, stuck to the bottom. Content disappears beneath the line. */
+.hero-band {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  background: var(--paper);
+}
+.hero-band .hero__ground {
+  position: relative;
+  height: 2px;
+  background: var(--ink);
+  z-index: 2;
+}
+.hero-band .ticker {
+  border-bottom: 1px solid var(--line-light);
+}
+.hole {
+  position: absolute;
+  top: -9px;
+  right: 24px;
+  width: 52px;
+  height: 9px;
+  border-radius: 52px 52px 0 0 / 9px 9px 0 0;
+  background: var(--charcoal);
+  z-index: 3;
+}
+.hole__rim {
+  position: absolute;
+  inset: -2px -2px 0;
+  border-radius: 56px 56px 0 0 / 11px 11px 0 0;
+  border: 2px solid var(--ink);
+  border-bottom: 0;
 }
 
 /* Header button steps back while the form is the focus. */
@@ -1166,26 +1158,14 @@ textarea.control {
     transform: none;
   }
   .hero-stage {
-    height: auto;
-    --pf: 0;
     --pv: 1;
   }
-  .hero-stage__pin {
+  .hero__form {
     position: static;
-    height: auto;
-    overflow: visible;
-    padding-bottom: 96px;
   }
-  .hero-stage__lift,
   .stage .screen {
-    position: static;
     transform: none;
     filter: none;
-    opacity: 1;
-    margin: 0 auto 1.5rem;
-  }
-  .stage {
-    position: static;
   }
 }
 
@@ -1193,11 +1173,11 @@ textarea.control {
   /* The form fits one phone screen: shorter fields, tighter gaps. Input text
      stays 16px so iOS doesn't zoom the page on focus. */
   .hero__form {
-    padding: 0.9rem 0.9rem 1rem;
+    padding: 1.1rem 1rem 1.15rem;
   }
   .hero__formlead {
-    font-size: 0.92rem;
-    margin-bottom: 0.6rem;
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
   }
   .form {
     gap: 0.5rem;
@@ -1249,12 +1229,6 @@ textarea.control {
   }
 }
 
-@media (max-height: 720px) {
-  .hero-stage {
-    --ground-offset: 48px;
-  }
-}
-
 /* ── ≥ 480 ─────────────────────────────────────────────────────────────── */
 
 @media (min-width: 480px) {
@@ -1280,8 +1254,7 @@ textarea.control {
     padding-top: 2.5rem;
   }
   .hero-stage {
-    --stage-gap: 124px;
-    --ground-offset: 44px;
+    --char-room: 132px;
   }
   .stickycta {
     display: none;
@@ -1350,6 +1323,7 @@ textarea.control {
   .hole {
     width: 62px;
     height: 10px;
+    top: -10px;
     border-radius: 62px 62px 0 0 / 10px 10px 0 0;
   }
 }
