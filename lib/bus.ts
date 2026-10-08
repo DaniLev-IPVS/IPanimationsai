@@ -6,8 +6,10 @@
 export type BusEvents = {
   /** The character flipped the switch: start the sizzle. */
   "screen:on": void;
-  /** A lead was successfully submitted. */
-  "lead:sent": void;
+  /** The visitor touched a form field for the first time. */
+  "form:start": void;
+  /** A lead was successfully submitted; eventId dedupes pixel vs server event. */
+  "lead:sent": { eventId: string };
   /** True while the form is the focus of the pinned hero stage. */
   "form:focus": boolean;
 };

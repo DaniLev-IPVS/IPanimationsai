@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BUDGET_OPTIONS, PURPOSE_OPTIONS } from "@/content/site";
 import { emit } from "@/lib/bus";
+import { captureAttribution, newEventId, type Attribution } from "@/lib/attribution";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -20,6 +21,12 @@ export default function LeadForm({
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  const attribution = useRef<Attribution>({});
+
+  // Read the ad's URL parameters on landing, before any in-page navigation.
+  useEffect(() => {
+    attribution.current = captureAttribution();
+  }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,6 +35,9 @@ export default function LeadForm({
     const fd = new FormData(e.currentTarget);
     setStatus("sending");
     setError(null);
+    // Shared by the browser pixel and the server's Conversions API call so Meta
+    // counts the registration once.
+    const eventId = newEventId();
 
     try {
       const res = await fetch("/api/lead", {
@@ -41,6 +51,8 @@ export default function LeadForm({
           purpose: String(fd.get("purpose") ?? ""),
           comment: String(fd.get("comment") ?? "").trim(),
           source_section: source,
+          event_id: eventId,
+          ...attribution.current,
           // honeypot — real people leave this empty
           company_website: String(fd.get("company_website") ?? ""),
         }),
@@ -51,7 +63,7 @@ export default function LeadForm({
         throw new Error(body?.error ?? "Something went wrong.");
       }
       setStatus("sent");
-      emit("lead:sent");
+      emit("lead:sent", { eventId });
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -74,7 +86,14 @@ export default function LeadForm({
   }
 
   return (
-    <form className="form" onSubmit={onSubmit}>
+    // Touching any field counts as starting the form (focus covers keyboard and
+    // tap; pointerdown catches clicks on labels and the select chevrons).
+    <form
+      className="form"
+      onSubmit={onSubmit}
+      onFocus={() => emit("form:start")}
+      onPointerDown={() => emit("form:start")}
+    >
       <Field label="Name" name="name" autoComplete="name" required enterKeyHint="next" />
       <Field
         label="Email"

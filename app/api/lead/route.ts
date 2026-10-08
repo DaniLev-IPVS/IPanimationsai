@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { BUDGET_OPTIONS, PURPOSE_OPTIONS } from "@/content/site";
+import { ATTRIBUTION_KEYS } from "@/lib/attribution";
+import { sendCapiEvents } from "@/lib/capi";
 
 /**
- * Lead capture: browser → this route → Zapier catch hook → Notion.
+ * Lead capture: browser → this route → Zapier catch hook → Notion, plus a
+ * CompleteRegistration + Lead to Meta's Conversions API once the Zap has it.
  *
  * It goes through our own route rather than posting to Zapier from the browser
  * so that the hook URL stays out of the page source, spam gets filtered before
@@ -24,8 +27,9 @@ type Payload = {
   purpose?: string;
   comment?: string;
   source_section?: string;
+  event_id?: string;
   company_website?: string;
-};
+} & Partial<Record<(typeof ATTRIBUTION_KEYS)[number], string>>;
 
 export async function POST(req: Request) {
   let body: Payload;
@@ -96,6 +100,9 @@ export async function POST(req: Request) {
     summary,                                  // ready-made text for the Telegram message
     page_url: req.headers.get("referer") ?? `https://ipanimations.ai/`,
     submitted_at: submittedAt,
+    // Which ad it came from — empty strings when the visit wasn't from an ad,
+    // so the Zap always sees every key.
+    ...attributionOf(body),
   };
 
   if (!hook) {
@@ -125,5 +132,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "We couldn't send that." }, { status: 502 });
   }
 
+  // Only once the Zap has the lead, mirroring the pixel (which fires on success).
+  // Never fails the request: the lead is already delivered.
+  const eventId = body.event_id?.slice(0, 80);
+  await sendCapiEvents(
+    req,
+    [
+      { name: "CompleteRegistration", id: eventId },
+      { name: "Lead", id: eventId && `${eventId}-lead` },
+    ],
+    { email, phone, firstName, lastName },
+  );
   return NextResponse.json({ ok: true });
+}
+
+function attributionOf(body: Payload) {
+  const out = {} as Record<(typeof ATTRIBUTION_KEYS)[number], string>;
+  for (const key of ATTRIBUTION_KEYS) out[key] = String(body[key] ?? "").trim().slice(0, 200);
+  return out;
 }

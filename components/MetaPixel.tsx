@@ -3,6 +3,7 @@
 import Script from "next/script";
 import { useEffect } from "react";
 import { on } from "@/lib/bus";
+import { newEventId } from "@/lib/attribution";
 
 declare global {
   interface Window {
@@ -11,12 +12,39 @@ declare global {
 }
 
 /**
- * Meta Pixel (the dataset in Events Manager). PageView fires on load; a
- * standard Lead event fires when the form is accepted, so the ad campaigns
- * optimise on real submissions rather than clicks.
+ * Meta Pixel (the dataset in Events Manager). PageView fires on load; Contact
+ * fires once when the visitor first touches a form field (form started); and
+ * CompleteRegistration fires when the form is accepted — that's the event the
+ * "Animation for hire" ad sets optimise on. Lead fires alongside it for
+ * reporting. Each one is also sent server-side through the Conversions API
+ * with the same eventID, so Meta counts it once.
  */
 export function MetaPixel({ id }: { id: string }) {
-  useEffect(() => on("lead:sent", () => window.fbq?.("track", "Lead")), []);
+  useEffect(() => {
+    let started = false;
+    const offStart = on("form:start", () => {
+      if (started) return;
+      started = true;
+      const eventID = newEventId();
+      window.fbq?.("track", "Contact", {}, { eventID });
+      // Server twin through the Conversions API; keepalive survives navigation.
+      fetch("/api/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "Contact", event_id: eventID }),
+        keepalive: true,
+      }).catch(() => {});
+    });
+    // /api/lead already sent the server twins of these two.
+    const offSent = on("lead:sent", ({ eventId }) => {
+      window.fbq?.("track", "CompleteRegistration", {}, { eventID: eventId });
+      window.fbq?.("track", "Lead", {}, { eventID: `${eventId}-lead` });
+    });
+    return () => {
+      offStart();
+      offSent();
+    };
+  }, []);
 
   if (!id) return null;
   return (
