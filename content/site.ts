@@ -10,6 +10,8 @@ export const brand = {
   tagline: "The creative animation studio of IP Ventures",
   domain: "ipanimations.ai",
   email: "hello@ipanimations.ai",
+  /** Meta Pixel / Events Manager dataset ID (carried over from the old site). */
+  metaPixelId: "863938959764048",
   /** The call to action everywhere except the form's own submit button. */
   book: "Book with us",
   /** From Branding/brand-kit. */

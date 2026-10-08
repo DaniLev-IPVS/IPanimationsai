@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Grandstander, Manrope } from "next/font/google";
 import "./globals.css";
 import { brand, hero } from "@/content/site";
+import { MetaPixel } from "@/components/MetaPixel";
 
 const display = Grandstander({
   subsets: ["latin"],
@@ -43,7 +44,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${text.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <MetaPixel id={brand.metaPixelId} />
+      </body>
     </html>
   );
 }
