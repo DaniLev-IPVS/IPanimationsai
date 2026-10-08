@@ -8,8 +8,8 @@ export type BusEvents = {
   "screen:on": void;
   /** A lead was successfully submitted. */
   "lead:sent": void;
-  /** The character's stage row scrolled into view (mobile: the intro should start now). */
-  "stage:visible": void;
+  /** True while the form is the focus of the pinned hero stage. */
+  "form:focus": boolean;
 };
 
 type Handler<T> = (payload: T) => void;

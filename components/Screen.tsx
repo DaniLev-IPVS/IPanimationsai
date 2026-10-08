@@ -6,8 +6,8 @@ import { mediaUrl } from "@/lib/media";
 import { on } from "@/lib/bus";
 
 /**
- * The phone in the hero: a vertical 9:16 screen. Dark until it scrolls into
- * view (or "screen:on" fires), then plays the sizzle. Until the real
+ * The phone in the hero stage: a vertical 9:16 screen. Dark until the stage
+ * fires "screen:on" (once it has risen and come into focus), then plays. Until the real
  * cut exists it plays a crossfade of the vertical reel posters instead, so the
  * hero already behaves right.
  *
@@ -30,23 +30,6 @@ export default function Screen() {
     .filter(Boolean);
 
   useEffect(() => on("screen:on", () => setOnAir(true)), []);
-
-  // Switch on when half the phone is in view.
-  useEffect(() => {
-    const el = document.getElementById("screen");
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          setOnAir(true);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.5 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
 
   useEffect(() => {
     if (!onAir || !hasVideo) return;

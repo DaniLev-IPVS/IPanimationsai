@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { brand } from "@/content/site";
+import { on } from "@/lib/bus";
 import Logo from "./Logo";
 
 export function Header() {
@@ -14,7 +15,7 @@ export function Header() {
         <a href="#work" className="top__link">
           Our work
         </a>
-        <a href="#quote" className="btn btn--sm">
+        <a href="#quote" className="btn btn--sm top__cta">
           {brand.book}
         </a>
       </nav>
@@ -30,20 +31,15 @@ export function StickyCta() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    const form = document.getElementById("quote");
-    if (!form) return;
     let formVisible = true;
     let keyboard = false;
     const update = () => setShow(!formVisible && !keyboard);
 
-    const io = new IntersectionObserver(
-      ([e]) => {
-        formVisible = e.isIntersecting;
-        update();
-      },
-      { threshold: 0.05 },
-    );
-    io.observe(form);
+    // The hero stage says when the form is the focus; otherwise the bar shows.
+    const off = on("form:focus", (f) => {
+      formVisible = f;
+      update();
+    });
 
     const vv = window.visualViewport;
     const onVV = () => {
@@ -53,7 +49,7 @@ export function StickyCta() {
     };
     vv?.addEventListener("resize", onVV);
     return () => {
-      io.disconnect();
+      off();
       vv?.removeEventListener("resize", onVV);
     };
   }, []);

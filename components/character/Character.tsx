@@ -37,9 +37,11 @@ export default function Character() {
     const measure = () => {
       const vw = window.innerWidth, vh = window.innerHeight, sy = window.scrollY;
       const rect = (id: string) => document.getElementById(id)?.getBoundingClientRect();
-      const ground = rect("stage-ground"), holeEl = document.getElementById("hole"),
-        fg = rect("footer-ground"), work = rect("work"), wrap = document.querySelector(".hero__grid")?.getBoundingClientRect();
-      if (!ground || !holeEl || !fg || !work) return;
+      const ground = rect("stage-ground"), holeEl = document.getElementById("hole"), stageEl = document.getElementById("quote"),
+        fg = rect("footer-ground"), work = rect("work"), wrap = document.querySelector(".hero__top")?.getBoundingClientRect();
+      if (!ground || !holeEl || !stageEl || !fg || !work) return;
+      const stageR = stageEl.getBoundingClientRect();
+      const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
       const isMobile = vw < 768;
       const scale = isMobile ? 0.27 : vw < 1100 ? 0.4 : 0.46;
       // The page's side margin. If the character fits in it he falls down the
@@ -50,12 +52,16 @@ export default function Character() {
       const laneX = behind ? (isMobile ? vw - 36 : vw - 64) : vw - gutter / 2;
       const contentRight = wrap ? wrap.right : vw - gutter;
       const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh);
-      const heroGround = ground.top + sy;
+      // The ground line lives in the pinned stage; its resting document y is the section's bottom.
+      const heroGround = stageR.bottom + sy - ground.height;
+      const stageStart = stageR.top + sy - topH;
+      const stageEnd = stageR.bottom + sy - vh;
       const footerGround = fg.top + sy;
       // One lane for everything: he stands just left of the hole, hops in,
       // falls down the lane, lands in it, and climbs back up it.
       const holeX = laneX;
       const standX = laneX - 78 * scale;
+      const leftX = behind ? 44 : Math.max(40, gutter / 2);
       const footerX = laneX;
       const holeW = holeEl.getBoundingClientRect().width || 56;
       holeEl.style.left = `${Math.round(holeX - holeW / 2)}px`;
@@ -96,9 +102,8 @@ export default function Character() {
       }
       footholds.push({ docY: heroGround, x: standX });
 
-      const layout: Layout = { vw, vh, maxScroll, scale, behind, laneX, standX, holeX, heroGround, footerGround, footerX, workTop: work.top + sy, footholds };
+      const layout: Layout = { vw, vh, maxScroll, scale, behind, laneX, standX, leftX, holeX, heroGround, stageStart, stageEnd, footerGround, footerX, workTop: work.top + sy, footholds };
       director.layout = layout;
-      svg.classList.toggle("is-front", !behind);
     };
 
     let measureTimer = 0;
@@ -118,11 +123,11 @@ export default function Character() {
           io.disconnect();
         }
       },
-      { threshold: 0, rootMargin: "0px 0px -24px 0px" },
+      { threshold: 0.4 },
     );
-    // The intro starts once the ground line he walks along is on screen.
-    const groundEl = document.getElementById("stage-ground");
-    if (groundEl) io.observe(groundEl);
+    // The intro starts once the pinned stage he walks along is mostly on screen.
+    const pinEl = document.querySelector(".hero-stage__pin");
+    if (pinEl) io.observe(pinEl);
 
     const offLead = on("lead:sent", () => director.celebrate(performance.now()));
     const onMouse = (e: MouseEvent) => director.setMouse(e.clientX, e.clientY);
@@ -138,6 +143,7 @@ export default function Character() {
 
     const draw = (now: number) => {
       raf = requestAnimationFrame(draw);
+      const dtF = lastTick ? Math.min(0.05, (now - lastTick) / 1000) : 1 / 60;
       // Cheap self-profiling: if frames keep arriving late, degrade.
       if (lastTick) {
         const gap = now - lastTick;
@@ -152,7 +158,9 @@ export default function Character() {
       }
       lastTick = now;
 
-      let f = director.update(now, window.scrollY);
+      const groundEl = document.getElementById("stage-ground");
+      const groundY = groundEl ? groundEl.getBoundingClientRect().top : 0;
+      let f = director.update(now, window.scrollY, groundY);
       if (!f) return;
       const L = director.layout!;
       if (debugPose && POSES[debugPose]) {
@@ -161,13 +169,16 @@ export default function Character() {
 
       const s = L.scale;
       const sk = solve(f.pose);
-      const dtF = lastTick ? Math.min(0.05, (now - lastTick) / 1000) : 1 / 60;
       faceNow += (f.face - faceNow) * (1 - Math.exp(-dtF * 16));
       if (Math.abs(f.face - faceNow) < 0.01) faceNow = f.face;
       const faceScale = Math.sign(faceNow || 1) * Math.max(0.08, Math.abs(faceNow));
       g.setAttribute("transform", `translate(${f.x.toFixed(1)} ${f.y.toFixed(1)}) scale(${(s * faceScale * f.pose.sx).toFixed(3)} ${(s * f.pose.sy).toFixed(3)}) translate(-60 -${GROUND_Y})`);
       g.style.opacity = String(f.opacity);
       svg.classList.toggle("is-dark", f.dark);
+      // On narrow screens he falls behind the content, but while he is on the
+      // hero's ground line (pointing, walking, jumping) he is in front of it,
+      // so the rising phone passes behind him rather than over him.
+      svg.classList.toggle("is-front", !L.behind || !!f.attached);
 
       (R.legL as SVGPolylineElement).setAttribute("points", `${pt(sk.hip)} ${pt(sk.kneeL)} ${pt(sk.footL)}`);
       (R.armL as SVGPolylineElement).setAttribute("points", `${pt(sk.shoulder)} ${pt(sk.elbowL)} ${pt(sk.handL)}`);

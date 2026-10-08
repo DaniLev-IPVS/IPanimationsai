@@ -23,9 +23,12 @@ export type Layout = {
   scale: number;
   behind: boolean;        // layer sits behind content (no gutter to fall down)
   laneX: number;          // viewport x of the fall lane
-  standX: number;         // where he idles in the hero
+  standX: number;         // where he idles by the hole
+  leftX: number;          // where he stands pointing at the form
   holeX: number;
-  heroGround: number;     // document y
+  heroGround: number;     // document y of the ground line once the stage has released
+  stageStart: number;     // scroll at which the hero stage pins
+  stageEnd: number;       // scroll at which it releases
   footerGround: number;   // document y
   footerX: number;        // where he lands
   workTop: number;        // document y where the page turns Charcoal
@@ -49,10 +52,12 @@ export type Frame = {
   thud: boolean;              // true on the impact frame only
   zFront: boolean;            // layer in front of content
   paused: boolean;            // hovering mid-air because scrolling stopped
+  /** Standing on the measured ground line (real viewport y): skip the scroll-smoothing shift. */
+  attached?: boolean;
 };
 
 type Mode = "down" | "up";
-type Intro = "waiting" | "walk" | "settle" | "done";
+type Intro = "waiting" | "walk" | "done";
 
 const BLEND_MS = 260;
 
@@ -80,6 +85,8 @@ export class Director {
   private climbFace: 1 | -1 = 1;
   private lastMoveAt = 0;
   private walkFrom = 0;
+  private lastX = NaN;
+  private groundY = 0;
   /** Scroll position he actually follows: the real one, low-passed so wheel steps read as motion. */
   private s = NaN;
 
@@ -131,9 +138,10 @@ export class Director {
     return { pinY, sPin, jumpLen, sJumpStart, sLand, landLen, sLandStart, climbOffset };
   }
 
-  update(now: number, realScroll: number): Frame | null {
+  update(now: number, realScroll: number, groundY: number): Frame | null {
     const L = this.layout;
     if (!L) return null;
+    this.groundY = groundY;
     const dt = this.lastNow ? Math.min(0.05, (now - this.lastNow) / 1000) : 1 / 60;
     this.lastNow = now;
 
@@ -205,8 +213,8 @@ export class Director {
       f = { ...f, x: lerp(this.blendFrom.x, f.x, t), y: lerp(this.blendFrom.y, f.y, t), pose: mix(this.blendFrom.pose, f.pose, t) };
     } else this.blendFrom = null;
 
-    // Back to real-scroll viewport space.
-    f = { ...f, y: f.y + (scrollY - realScroll) };
+    // Back to real-scroll viewport space (not for frames standing on the measured ground).
+    if (!f.attached) f = { ...f, y: f.y + (scrollY - realScroll) };
     f.dark = realScroll + f.y > L.workTop;
     f.zFront = !L.behind;
     const airborne = scrollY > K.sPin && scrollY < K.sLand && this.intro === "done" && !this.reduced;
@@ -221,59 +229,84 @@ export class Director {
 
   /* ── hero ─────────────────────────────────────────────────────────── */
 
+  private stageP(scrollY: number) {
+    const L = this.layout!;
+    return clamp((scrollY - L.stageStart) / Math.max(1, L.stageEnd - L.stageStart), 0, 1);
+  }
+
   private introFrame(now: number, scrollY: number, dt: number): Frame {
     const L = this.layout!;
-    const gy = L.heroGround - scrollY;
+    const gy = this.groundY;
+    // Landed mid-stage? Skip the walk-in.
+    if (this.stageP(scrollY) > 0.25) { this.intro = "done"; return this.heroIdle(now, scrollY, dt); }
     const t = now - this.introT0;
-    const from = L.vw + 40 * L.scale;
-    const dist = Math.max(1, from - L.standX);
-    const walkMs = clamp((dist / 300) * 1000, 500, 1800);
-
-    if (this.intro === "walk") {
-      const q = clamp(t / walkMs, 0, 1);
-      this.face = -1;
-      this.walkPhase += dt * 2.1;
-      const x = lerp(from, L.standX, q < 0.92 ? (q / 0.92) * 0.98 : 0.98 + easeOut((q - 0.92) / 0.08) * 0.02);
-      // Hop over the hole on the way past.
-      const near = clamp(1 - Math.abs(x - L.holeX) / (56 * L.scale), 0, 1);
-      const hop = Math.sin(near * Math.PI * 0.5) * 34 * L.scale;
-      let pose = walkPose(this.walkPhase);
-      if (near > 0) pose = mix(pose, POSES.leap, near * 0.8);
-      if (q > 0.94) pose = mix(pose, POSES.idle, (q - 0.94) / 0.06);
-      const f = this.base(x, gy - hop, pose);
-      f.shadow = near > 0 ? 1 - near : 1;
-      if (q >= 1) { this.intro = "settle"; this.introT0 = now; }
-      return f;
-    }
-    // settle: a glance back at the hole, then face the page
-    const q = clamp(t / 700, 0, 1);
-    this.face = q < 0.55 ? 1 : -1;
-    const f = this.base(L.standX, gy, mix(POSES.idle, POSES.look, Math.sin(q * Math.PI) * 0.7));
-    if (q >= 1) { this.intro = "done"; this.face = -1; }
+    const from = -40 * L.scale;
+    const ms = clamp(((L.leftX - from) / 300) * 1000, 400, 1200);
+    const q = clamp(t / ms, 0, 1);
+    this.face = 1;
+    this.walkPhase += dt * 2.1;
+    const x = lerp(from, L.leftX, q < 0.9 ? (q / 0.9) * 0.97 : 0.97 + easeOut((q - 0.9) / 0.1) * 0.03);
+    let pose = walkPose(this.walkPhase);
+    if (q > 0.92) pose = mix(pose, POSES.pointUp, (q - 0.92) / 0.08);
+    const f = this.base(x, gy, pose);
+    f.attached = true;
+    f.opacity = clamp(q * 6, 0, 1);
+    if (q >= 1) { this.intro = "done"; this.lastX = L.leftX; }
     return f;
   }
 
   private heroIdle(now: number, scrollY: number, dt: number): Frame {
     const L = this.layout!;
-    const gy = L.heroGround - scrollY;
-    // Weight shift + breathing, slow; head follows the cursor on desktop.
+    const gy = this.groundY;
+    const p = this.stageP(scrollY);
     const breathe = Math.sin(now / 900) * 0.5 + 0.5;
-    let pose = mix(POSES.idle, POSES.look, breathe * 0.25);
-    if (this.intro === "waiting") pose = POSES.idle;
-    if (this.mouse.has && !this.lowPower) {
-      const dx = clamp((this.mouse.x - L.standX) / L.vw, -1, 1);
-      this.face = dx > 0.04 ? 1 : -1;
-      pose = { ...pose, head: pose.head + Math.abs(dx) * 7, lean: pose.lean + Math.abs(dx) * 3 };
-    } else this.face = -1;
-    const f = this.base(L.standX, gy, pose);
+    let x: number;
+    let pose: Pose;
+
+    if (p < 0.3) {
+      // By the form, pointing up at it.
+      x = L.leftX;
+      this.face = 1;
+      pose = mix(POSES.pointUp, POSES.look, breathe * 0.15);
+      if (this.mouse.has && !this.lowPower) {
+        const dx = clamp((this.mouse.x - x) / L.vw, -1, 1);
+        pose = { ...pose, head: pose.head + dx * 5 };
+      }
+    } else if (p < 0.9) {
+      // Walking across to the hole as the phone takes the screen.
+      const t = easeInOut((p - 0.3) / 0.6);
+      x = lerp(L.leftX, L.standX, t);
+      const dx = Number.isNaN(this.lastX) ? 0 : x - this.lastX;
+      if (Math.abs(dx) > 0.2) {
+        this.walkPhase += Math.abs(dx) / (34 * L.scale);
+        this.face = dx > 0 ? 1 : -1;
+      }
+      const moving = clamp(Math.abs(dx) / (1.5 * L.scale), 0, 1);
+      pose = mix(POSES.idle, walkPose(this.walkPhase), moving);
+      if (t > 0.97) pose = mix(pose, POSES.idle, (t - 0.97) / 0.03);
+    } else {
+      // By the hole, facing back at the page.
+      x = L.standX;
+      this.face = -1;
+      pose = mix(POSES.idle, POSES.look, breathe * 0.25);
+      if (this.mouse.has && !this.lowPower) {
+        const dx = clamp((this.mouse.x - x) / L.vw, -1, 1);
+        this.face = dx > 0.04 ? 1 : -1;
+        pose = { ...pose, head: pose.head + Math.abs(dx) * 7, lean: pose.lean + Math.abs(dx) * 3 };
+      }
+    }
+    this.lastX = x;
+    const f = this.base(x, gy, pose);
+    f.attached = true;
     if (this.intro === "waiting") f.opacity = 0;
+    void dt;
     return f;
   }
 
   private jumpIn(scrollY: number, K: ReturnType<Director["key"]>): Frame {
     const L = this.layout!;
     const q = clamp((scrollY - K.sJumpStart) / K.jumpLen, 0, 1);
-    const gy = L.heroGround - scrollY;
+    const gy = this.groundY;
     this.face = 1;
     const arcH = clamp(L.vh * 0.085, 36, 74);
 
@@ -289,6 +322,7 @@ export class Director {
     const x = lerp(L.standX, L.holeX, travel);
     const y = gy - Math.sin(travel * Math.PI) * arcH;
     const f = this.base(x, y, pose);
+    f.attached = true;
     f.shadow = q < 0.22 ? 1 : clamp(1 - travel * 2, 0, 1);
     return f;
   }
@@ -427,7 +461,7 @@ export class Director {
 
   private reducedFrame(scrollY: number, K: ReturnType<Director["key"]>): Frame {
     const L = this.layout!;
-    if (scrollY <= K.sPin) return this.base(L.standX, L.heroGround - scrollY, POSES.idle);
+    if (scrollY <= K.sPin) { const f = this.base(L.standX, this.groundY, POSES.idle); f.attached = true; return f; }
     if (scrollY >= K.sLandStart) return this.base(L.footerX, L.footerGround - scrollY, POSES.idle);
     const f = this.base(L.laneX, -999, POSES.idle);
     f.opacity = 0;

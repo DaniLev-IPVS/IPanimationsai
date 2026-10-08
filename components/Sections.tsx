@@ -1,7 +1,6 @@
 import { brand, hero, ticker, testimonials, reel, about } from "@/content/site";
-import LeadForm from "./LeadForm";
 import ReelCard from "./ReelCard";
-import Screen from "./Screen";
+import HeroStage from "./HeroStage";
 
 /** "==word==" → highlighted word. The closing dot is added by the caller. */
 function Highlight({ text }: { text: string }) {
@@ -25,48 +24,30 @@ function Highlight({ text }: { text: string }) {
 
 export function Hero() {
   return (
-    <section id="top" className="hero">
-      <div className="wrap hero__grid">
-        <div className="hero__copy">
-          <h1 className="h1">
-            <Highlight text={hero.headline} />
-            <span className="dot" aria-hidden="true" />
-          </h1>
-          <p className="body hero__sub">{hero.sub}</p>
-        </div>
-
-        <ul className="offer">
-          {hero.offer.map((o) => (
-            <li key={o.title} className="offer__item">
-              <span className="offer__text">
-                <strong>{o.title}</strong>
-                {o.body}
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="hero__form" id="quote">
-          <p className="body hero__formlead">{hero.formLead}</p>
-          <LeadForm source="hero" cta={hero.cta} />
-          <ul className="trust" aria-label="Clients and results">
-            {hero.trust.map((t) => (
-              <li key={t}>{t}</li>
+    <>
+      <section id="top" className="hero">
+        <div className="wrap hero__top">
+          <div className="hero__copy">
+            <h1 className="h1">
+              <Highlight text={hero.headline} />
+              <span className="dot" aria-hidden="true" />
+            </h1>
+            <p className="body hero__sub">{hero.sub}</p>
+          </div>
+          <ul className="offer">
+            {hero.offer.map((o) => (
+              <li key={o.title} className="offer__item">
+                <span className="offer__text">
+                  <strong>{o.title}</strong>
+                  {o.body}
+                </span>
+              </li>
             ))}
           </ul>
         </div>
-
-        <div className="stage" id="stage">
-          <Screen />
-        </div>
-      </div>
-      {/* The character's hole sits on the hero's ground line at the right
-          edge, positioned by the character engine. */}
-      <div className="hole" id="hole" aria-hidden="true">
-        <span className="hole__rim" />
-      </div>
-      <div className="hero__ground" id="stage-ground" aria-hidden="true" />
-    </section>
+      </section>
+      <HeroStage />
+    </>
   );
 }
 

@@ -43,6 +43,8 @@ export const POSES = {
   brushL:   P({ tR: 4, kR: 4, tL: -4, kL: 4, aR: 62, eR: -128, aL: -10, eL: -14, head: -2 }),
   brushR:   P({ tR: 4, kR: 4, tL: -4, kL: 4, aR: 48, eR: -118, aL: -12, eL: -14, head: 2 }),
   point:    P({ tR: 6, kR: 4, tL: -6, kL: 4, aR: 84, eR: 2, aL: -10, eL: -16, head: 3, lean: 3 }),
+  /** Pointing up and forward, at the form above him. */
+  pointUp:  P({ tR: 6, kR: 4, tL: -6, kL: 4, aR: 126, eR: 4, aL: -8, eL: -16, head: 5, lean: 4 }),
   reach:    P({ tR: 8, kR: 6, tL: -6, kL: 4, aR: 96, eR: -4, aL: -14, eL: -14, lean: 8, head: 4 }),
   cheer:    P({ tR: 20, kR: 30, tL: -20, kL: 30, aR: 165, eR: 20, aL: 160, eL: -20, lean: -4, sx: 0.96, sy: 1.05, grounded: 0 }),
   hang:     P({ tR: 10, kR: 10, tL: -10, kL: 10, aR: 120, eR: 30, aL: 150, eL: 20, lean: 6, grounded: 0 }),
