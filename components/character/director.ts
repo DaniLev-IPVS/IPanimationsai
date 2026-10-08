@@ -87,6 +87,10 @@ export class Director {
   private walkFrom = 0;
   private lastX = NaN;
   private groundY = 0;
+  private submitX = NaN;
+  /** The hop-and-point at the Submit button: start time, 0 = not playing. */
+  private gestureT0 = 0;
+  private gestureEnd = 0;
   /** Scroll position he actually follows: the real one, low-passed so wheel steps read as motion. */
   private s = NaN;
 
@@ -138,10 +142,11 @@ export class Director {
     return { pinY, sPin, jumpLen, sJumpStart, sLand, landLen, sLandStart, climbOffset };
   }
 
-  update(now: number, realScroll: number, groundY: number): Frame | null {
+  update(now: number, realScroll: number, groundY: number, submitX: number): Frame | null {
     const L = this.layout;
     if (!L) return null;
     this.groundY = groundY;
+    this.submitX = submitX;
     const dt = this.lastNow ? Math.min(0.05, (now - this.lastNow) / 1000) : 1 / 60;
     this.lastNow = now;
 
@@ -251,8 +256,29 @@ export class Director {
     const f = this.base(x, gy, pose);
     f.attached = true;
     f.opacity = clamp(q * 6, 0, 1);
-    if (q >= 1) { this.intro = "done"; this.lastX = L.leftX; }
+    if (q >= 1) { this.intro = "done"; this.lastX = L.leftX; this.gestureT0 = now; }
     return f;
+  }
+
+  /**
+   * Hop, land, point at the Submit button. Returns the pose and how far off
+   * the ground he is at time t (ms since the gesture started). Holds the
+   * point after it finishes.
+   */
+  private gesture(t: number, breathe: number): { pose: Pose; lift: number } {
+    const L = this.layout!;
+    if (t < 220) return { pose: mix(POSES.idle, POSES.crouch, easeInOut(t / 220)), lift: 0 };
+    if (t < 540) {
+      const u = (t - 220) / 320;
+      return { pose: mix(POSES.crouch, POSES.leap, easeOut(Math.min(1, u * 2))), lift: Math.sin(u * Math.PI) * 44 * L.scale };
+    }
+    if (t < 700) return { pose: mix(POSES.leap, POSES.crouch, easeInOut((t - 540) / 160)), lift: 0 };
+    if (t < 980) return { pose: mix(POSES.crouch, POSES.pointUp, easeOut((t - 700) / 280)), lift: 0 };
+    return { pose: mix(POSES.pointUp, POSES.look, breathe * 0.12), lift: 0 };
+  }
+
+  private faceSubmit(x: number) {
+    if (!Number.isNaN(this.submitX)) this.face = this.submitX >= x ? 1 : -1;
   }
 
   private heroIdle(now: number, scrollY: number, dt: number): Frame {
@@ -260,34 +286,51 @@ export class Director {
     const gy = this.groundY;
     const p = this.stageP(scrollY);
     const breathe = Math.sin(now / 900) * 0.5 + 0.5;
+    const stillFor = now - this.lastMoveAt;
     let x: number;
     let pose: Pose;
+    let lift = 0;
 
     if (p < 0.3) {
-      // By the form, pointing up at it.
+      // By the form: hop and point at Submit, again every few seconds.
       x = L.leftX;
-      this.face = 1;
-      pose = mix(POSES.pointUp, POSES.look, breathe * 0.15);
-      if (this.mouse.has && !this.lowPower) {
+      if (!this.gestureT0 || (now - this.gestureT0 > 3600 && stillFor > 400)) this.gestureT0 = now;
+      const g = this.gesture(now - this.gestureT0, breathe);
+      pose = g.pose;
+      lift = g.lift;
+      this.faceSubmit(x);
+      if (this.mouse.has && !this.lowPower && now - this.gestureT0 > 980) {
         const dx = clamp((this.mouse.x - x) / L.vw, -1, 1);
         pose = { ...pose, head: pose.head + dx * 5 };
       }
     } else if (p < 0.9) {
-      // Walking across to the hole as the phone takes the screen.
+      // Walking across as the phone takes the screen. Pause the scroll and he
+      // stops, hops, and points back at the Submit button.
       const t = easeInOut((p - 0.3) / 0.6);
       x = lerp(L.leftX, L.standX, t);
       const dx = Number.isNaN(this.lastX) ? 0 : x - this.lastX;
-      if (Math.abs(dx) > 0.2) {
+      const moving = Math.abs(dx) > 0.2;
+      if (moving) {
         this.walkPhase += Math.abs(dx) / (34 * L.scale);
         this.face = dx > 0 ? 1 : -1;
+        this.gestureT0 = 0;
+        const amt = clamp(Math.abs(dx) / (1.5 * L.scale), 0, 1);
+        pose = mix(POSES.idle, walkPose(this.walkPhase), amt);
+      } else if (stillFor > 550) {
+        if (!this.gestureT0) this.gestureT0 = now;
+        const g = this.gesture(now - this.gestureT0, breathe);
+        pose = g.pose;
+        lift = g.lift;
+        this.faceSubmit(x);
+      } else {
+        pose = mix(walkPose(this.walkPhase), POSES.idle, clamp(stillFor / 250, 0, 1));
       }
-      const moving = clamp(Math.abs(dx) / (1.5 * L.scale), 0, 1);
-      pose = mix(POSES.idle, walkPose(this.walkPhase), moving);
       if (t > 0.97) pose = mix(pose, POSES.idle, (t - 0.97) / 0.03);
     } else {
       // By the hole, facing back at the page.
       x = L.standX;
       this.face = -1;
+      this.gestureT0 = 0;
       pose = mix(POSES.idle, POSES.look, breathe * 0.25);
       if (this.mouse.has && !this.lowPower) {
         const dx = clamp((this.mouse.x - x) / L.vw, -1, 1);
@@ -296,8 +339,9 @@ export class Director {
       }
     }
     this.lastX = x;
-    const f = this.base(x, gy, pose);
+    const f = this.base(x, gy - lift, pose);
     f.attached = true;
+    f.shadow = lift > 0 ? clamp(1 - lift / (40 * L.scale), 0.2, 1) : pose.grounded;
     if (this.intro === "waiting") f.opacity = 0;
     void dt;
     return f;

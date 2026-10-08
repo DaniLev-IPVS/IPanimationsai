@@ -11,9 +11,9 @@ import { hero } from "@/content/site";
  * header while the section scrolls for ~1.4 screens; that scroll budget is
  * the choreography:
  *
- *   p 0.00–0.30  the form holds, crisp, the only thing on screen
- *   p 0.30–0.75  the form lifts away and fades
- *   p 0.25–0.85  the phone rises from behind the ground line, grows from
+ *   p 0.00–0.30  the form (and the three points under it) hold, alone
+ *   p 0.30–0.75  they lift away and fade
+ *   p 0.40–0.95  the phone rises from behind the ground line, grows from
  *                60%, loses its blur and dimming, and starts playing at 0.7
  *   (the character walks from his pointing spot to the hole over the same
  *    stretch; that lives in the character engine)
@@ -32,6 +32,21 @@ export default function HeroStage() {
     let screenOn = false;
     let focus: boolean | null = null;
 
+    const lift = el.querySelector<HTMLElement>(".hero-stage__lift");
+    const fit = () => {
+      // Scale the form + points so they sit above the ground line with room
+      // for the character to stand (and hop) under them.
+      if (!lift) return;
+      const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
+      const pinH = window.innerHeight - topH;
+      const groundOffset = parseFloat(getComputedStyle(el).getPropertyValue("--ground-offset")) || 64;
+      const room = window.innerWidth < 768 ? 96 : 120;
+      const avail = pinH - groundOffset - room - 10;
+      const natural = lift.offsetHeight || 1;
+      const fs = Math.min(1, Math.max(0.72, avail / natural));
+      lift.style.setProperty("--fs", fs.toFixed(3));
+    };
+
     const tick = () => {
       raf = 0;
       const r = el.getBoundingClientRect();
@@ -41,7 +56,7 @@ export default function HeroStage() {
       // 0 when the panel pins, 1 when the section releases it.
       const p = reduced ? 1 : Math.min(1, Math.max(0, (topH - r.top) / budget));
       const pf = Math.min(1, Math.max(0, (p - 0.3) / 0.45));
-      const pv = Math.min(1, Math.max(0, (p - 0.25) / 0.6));
+      const pv = Math.min(1, Math.max(0, (p - 0.4) / 0.55));
       el.style.setProperty("--p", p.toFixed(4));
       el.style.setProperty("--pf", pf.toFixed(4));
       el.style.setProperty("--pv", pv.toFixed(4));
@@ -61,12 +76,18 @@ export default function HeroStage() {
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(tick);
     };
+    const onResize = () => {
+      fit();
+      onScroll();
+    };
+    fit();
     tick();
+    document.fonts?.ready.then(fit).catch(() => {});
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
       if (raf) cancelAnimationFrame(raf);
       document.documentElement.classList.remove("form-focus");
     };
@@ -75,12 +96,25 @@ export default function HeroStage() {
   return (
     <section className="hero-stage" id="quote" ref={ref}>
       <div className="hero-stage__pin">
-        <div className="hero__form" id="lead-form">
-          <p className="body hero__formlead">{hero.formLead}</p>
-          <LeadForm source="hero" cta={hero.cta} />
-          <ul className="trust" aria-label="Clients and results">
-            {hero.trust.map((t) => (
-              <li key={t}>{t}</li>
+        {/* The form and the three points lift away together. */}
+        <div className="hero-stage__lift">
+          <div className="hero__form" id="lead-form">
+            <p className="body hero__formlead">{hero.formLead}</p>
+            <LeadForm source="hero" cta={hero.cta} />
+            <ul className="trust" aria-label="Clients and results">
+              {hero.trust.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </div>
+          <ul className="offer offer--stage">
+            {hero.offer.map((o) => (
+              <li key={o.title} className="offer__item">
+                <span className="offer__text">
+                  <strong>{o.title}</strong>
+                  {o.body}
+                </span>
+              </li>
             ))}
           </ul>
         </div>

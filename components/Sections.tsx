@@ -34,16 +34,6 @@ export function Hero() {
             </h1>
             <p className="body hero__sub">{hero.sub}</p>
           </div>
-          <ul className="offer">
-            {hero.offer.map((o) => (
-              <li key={o.title} className="offer__item">
-                <span className="offer__text">
-                  <strong>{o.title}</strong>
-                  {o.body}
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
       </section>
       <HeroStage />

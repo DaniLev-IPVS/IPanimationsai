@@ -34,7 +34,7 @@ export const hero = {
     { title: "Cutting edge technique:", body: "frame by frame, rigged, or AI-built." },
   ],
   trust: ["1M+ followers built", "300M+ views", "Wooshi World", "Ethermail", "Babysnek"],
-  formLead: "Tell us what you need. You'll hear back within one business day.",
+  formLead: "Tell us what you need. We reply within a day.",
   cta: "Submit",
   /**
    * The sizzle loop, played on a vertical phone screen (9:16) in the hero that

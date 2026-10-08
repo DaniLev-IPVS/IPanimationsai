@@ -43,7 +43,7 @@ export default function Character() {
       const stageR = stageEl.getBoundingClientRect();
       const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
       const isMobile = vw < 768;
-      const scale = isMobile ? 0.27 : vw < 1100 ? 0.4 : 0.46;
+      const scale = isMobile ? 0.34 : vw < 1100 ? 0.42 : 0.46;
       // The page's side margin. If the character fits in it he falls down the
       // right margin in front of everything; otherwise he falls behind the
       // content along the right edge and peeks out between the cards.
@@ -52,8 +52,11 @@ export default function Character() {
       const laneX = behind ? (isMobile ? vw - 36 : vw - 64) : vw - gutter / 2;
       const contentRight = wrap ? wrap.right : vw - gutter;
       const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh);
-      // The ground line lives in the pinned stage; its resting document y is the section's bottom.
-      const heroGround = stageR.bottom + sy - ground.height;
+      // The ground line lives in the pinned stage, a little above the panel's
+      // bottom; its resting document y is the section's bottom minus that inset.
+      const pinR = document.querySelector(".hero-stage__pin")?.getBoundingClientRect();
+      const groundInset = pinR ? pinR.bottom - ground.top : ground.height;
+      const heroGround = stageR.bottom + sy - groundInset;
       const stageStart = stageR.top + sy - topH;
       const stageEnd = stageR.bottom + sy - vh;
       const footerGround = fg.top + sy;
@@ -160,7 +163,10 @@ export default function Character() {
 
       const groundEl = document.getElementById("stage-ground");
       const groundY = groundEl ? groundEl.getBoundingClientRect().top : 0;
-      let f = director.update(now, window.scrollY, groundY);
+      const submitEl = document.querySelector(".hero__form .btn--lg");
+      const sb = submitEl?.getBoundingClientRect();
+      const submitX = sb ? sb.left + sb.width / 2 : NaN;
+      let f = director.update(now, window.scrollY, groundY, submitX);
       if (!f) return;
       const L = director.layout!;
       if (debugPose && POSES[debugPose]) {
