@@ -1164,6 +1164,11 @@ textarea.control {
 }
 
 @media (max-width: 767px) {
+  /* He falls behind the content on phones; let him show through the cards. */
+  .quote,
+  .card__frame {
+    opacity: 0.9;
+  }
   /* The form fits one phone screen: shorter fields, tighter gaps. Input text
      stays 16px so iOS doesn't zoom the page on focus. */
   .hero__form {

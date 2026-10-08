@@ -14,7 +14,14 @@
 import { POSES, type Pose, mix, walkPose, clamp, lerp, easeInOut, easeOut, easeIn } from "./rig";
 
 /** Somewhere he can stand: document y of the surface, viewport x of his feet. */
-export type Platform = { docY: number; x: number };
+export type Platform = {
+  docY: number;
+  x: number;
+  /** A wall he kicks off: +1 = wall on his right, -1 = wall on his left. */
+  wall?: 1 | -1;
+  /** The hang point under the hole: the climb ends here with a muscle-up. */
+  hang?: boolean;
+};
 
 export type Layout = {
   vw: number;
@@ -33,11 +40,13 @@ export type Layout = {
   footerX: number;        // where he lands
   workTop: number;        // document y where the page turns Charcoal
   /**
-   * The climb: a chain of real elements he jumps between on the way up,
-   * bottom → top, starting on the footer ground and ending at his spot by
-   * the hole. Built by Character.tsx from the page's cards, text and images.
+   * The climb, bottom → top: on wide screens a ninja zigzag between the
+   * viewport edge and the side of the content; on phones a chain of real
+   * elements. Both end at the hang point under the hole, where he catches
+   * the rim and muscles up. Built by Character.tsx.
    */
   footholds: Platform[];
+  hangDepth: number;      // how far below the line his feet hang (px)
 };
 
 export type Frame = {
@@ -92,6 +101,9 @@ export class Director {
   private submitX = NaN;
   private submitY = NaN;
   private phoneP = 0;
+  /** The muscle-up out of the hole: start time, 0 = not playing; done once stood up. */
+  private muscleT0 = 0;
+  private muscleDone = false;
   /** The hop-and-point at the Submit button: start time, 0 = not playing. */
   private gestureT0 = 0;
   private gestureEnd = 0;
@@ -314,9 +326,54 @@ export class Director {
     return { pose: this.pointAt(x, feetY, bob), lift: 0 };
   }
 
+  /**
+   * Out of the hole: hands on the rim, a pull, a mantle over the edge, stand.
+   * Time-based; the body below the line is hidden by the band.
+   */
+  private muscleUp(now: number): Frame | null {
+    const L = this.layout!;
+    if (!this.muscleT0 || this.muscleDone) return null;
+    const t = now - this.muscleT0;
+    const gy = this.groundY;
+    const depth = L.hangDepth;
+    this.face = -1; // facing the page, back to the edge
+    let pose: Pose;
+    let y: number;
+    let x = L.holeX;
+    if (t < 420) {
+      // Hanging, a little swing.
+      pose = { ...POSES.hangRim, lean: Math.sin(t / 140) * 4 };
+      y = gy + depth;
+    } else if (t < 1100) {
+      const u = easeInOut((t - 420) / 680);
+      pose = u < 0.55 ? mix(POSES.hangRim, POSES.pullUp, u / 0.55) : mix(POSES.pullUp, POSES.mantle, (u - 0.55) / 0.45);
+      y = gy + depth * (1 - u);
+    } else if (t < 1500) {
+      const u = easeOut((t - 1100) / 400);
+      pose = mix(POSES.mantle, POSES.crouch, u);
+      y = gy;
+      x = lerp(L.holeX, L.standX, u * 0.6);
+    } else if (t < 1850) {
+      const u = easeOut((t - 1500) / 350);
+      pose = mix(POSES.crouch, POSES.idle, u);
+      y = gy;
+      x = lerp(L.holeX, L.standX, 0.6 + u * 0.4);
+    } else {
+      this.muscleDone = true;
+      return null;
+    }
+    const f = this.base(x, y, pose);
+    f.attached = true;
+    f.behindBand = t < 1100; // below the line until he is over the edge
+    f.shadow = t >= 1100 ? 1 : 0;
+    return f;
+  }
+
   private heroIdle(now: number, scrollY: number, dt: number): Frame {
     const L = this.layout!;
     const gy = this.groundY;
+    const mu = this.muscleUp(now);
+    if (mu) return mu;
     const p = this.stageP(scrollY);
     const breathe = Math.sin(now / 900) * 0.5 + 0.5;
     const stillFor = now - this.lastMoveAt;
@@ -380,6 +437,7 @@ export class Director {
     const q = clamp((scrollY - K.sJumpStart) / K.jumpLen, 0, 1);
     const gy = this.groundY;
     this.face = 1;
+    if (q > 0.3) { this.muscleT0 = 0; this.muscleDone = false; }
     const arcH = clamp(L.vh * 0.085, 36, 74);
 
     // Anticipation (0–0.22): sink into a crouch. Launch (0.22–0.4): spring
@@ -483,39 +541,66 @@ export class Director {
     return f;
   }
 
-  /* ── the climb: a few big leaps between real elements ──────────────── */
+  /* ── the climb: leaps between footholds, ending under the hole ───────── */
 
   private climbFrame(now: number, scrollY: number, K: ReturnType<Director["key"]>): Frame {
     const L = this.layout!;
+    const mu = this.muscleUp(now);
+    if (mu) return mu;
+
     // His pin eases from where he landed up to the fall line over the first
     // half-viewport of upward scroll, so he climbs up the screen rather than
     // hugging the bottom edge all the way.
     const ease = clamp((K.sLand - scrollY) / (L.vh * 0.5), 0, 1);
     const pin = lerp(K.climbOffset, K.pinY, easeInOut(ease));
-    const P = clamp(scrollY + pin, L.heroGround, L.footerGround); // feet, document y
-
     const chain = L.footholds; // bottom → top
-    let lower = chain[0], upper = chain[chain.length - 1];
+    const top = chain[chain.length - 1];
+    const P = clamp(scrollY + pin, top.docY, L.footerGround); // feet, document y
+
+    // Arrived under the hole: catch the rim and muscle up; once out, stand by
+    // the hole until the scroll carries him into the hero's own idle.
+    if (P <= top.docY + 1) {
+      if (!this.muscleDone) {
+        if (!this.muscleT0) this.muscleT0 = now;
+        const f = this.muscleUp(now);
+        if (f) return f;
+      }
+      this.face = -1;
+      const breathe = Math.sin(now / 900) * 0.5 + 0.5;
+      const f = this.base(L.standX, this.groundY, mix(POSES.idle, POSES.look, breathe * 0.25));
+      f.attached = true;
+      return f;
+    }
+
+    let lower = chain[0], upper = top;
     for (let i = 0; i < chain.length - 1; i++) {
       if (chain[i].docY >= P && chain[i + 1].docY <= P) { lower = chain[i]; upper = chain[i + 1]; break; }
     }
     const hop = Math.max(1, lower.docY - upper.docY);
     const t = clamp((lower.docY - P) / hop, 0, 1);
-    const arcH = clamp(hop * 0.3, 40 * L.scale, L.vh * 0.4);
+    const wallHop = !!lower.wall || !!upper.wall;
+    const arcH = wallHop ? clamp(hop * 0.18, 20 * L.scale, L.vh * 0.2) : clamp(hop * 0.3, 40 * L.scale, L.vh * 0.4);
     const docY = lerp(lower.docY, upper.docY, t) - Math.sin(t * Math.PI) * arcH;
     const x = lerp(lower.x, upper.x, easeInOut(t));
     const dx = upper.x - lower.x;
     if (Math.abs(dx) > 6) this.climbFace = dx < 0 ? -1 : 1;
     this.face = this.climbFace;
-    const last = upper.docY <= L.heroGround + 1;
 
     let pose: Pose;
-    if (t < 0.1) pose = mix(POSES.idle, POSES.crouch, easeInOut(t / 0.1));
-    else if (t < 0.24) pose = mix(POSES.crouch, POSES.leap, easeOut((t - 0.1) / 0.14));
-    else if (t < 0.82) pose = POSES.leap;
-    else if (t < 0.93) pose = mix(POSES.leap, POSES.crouch, easeInOut((t - 0.82) / 0.11));
-    else pose = mix(POSES.crouch, POSES.idle, easeOut((t - 0.93) / 0.07));
-    if (last && t >= 1) this.face = -1;
+    if (wallHop) {
+      // Ninja: coiled against the wall, push off, sail across, hit the next wall feet first.
+      if (t < 0.12) pose = mix(POSES.kick, POSES.leap, easeOut(t / 0.12));
+      else if (t < 0.8) pose = POSES.leap;
+      else pose = mix(POSES.leap, POSES.kick, easeInOut((t - 0.8) / 0.2));
+      if (upper.hang && t > 0.75) pose = mix(pose, POSES.hangRim, (t - 0.75) / 0.25);
+    } else {
+      if (t < 0.1) pose = mix(POSES.idle, POSES.crouch, easeInOut(t / 0.1));
+      else if (t < 0.24) pose = mix(POSES.crouch, POSES.leap, easeOut((t - 0.1) / 0.14));
+      else if (t < 0.82) pose = POSES.leap;
+      else if (upper.hang) pose = mix(POSES.leap, POSES.hangRim, easeInOut((t - 0.82) / 0.18));
+      else if (t < 0.93) pose = mix(POSES.leap, POSES.crouch, easeInOut((t - 0.82) / 0.11));
+      else pose = mix(POSES.crouch, POSES.idle, easeOut((t - 0.93) / 0.07));
+    }
 
     // Paused mid-leap: hover.
     const still = now - this.lastMoveAt > 450 && t > 0.1 && t < 0.9;
@@ -526,7 +611,7 @@ export class Director {
       return f;
     }
     const f = this.base(x, docY - scrollY, pose);
-    f.shadow = t < 0.1 || t > 0.9 ? 1 : 0;
+    f.shadow = !wallHop && (t < 0.1 || t > 0.9) ? 1 : 0;
     return f;
   }
 

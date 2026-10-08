@@ -38,7 +38,7 @@ export default function Character() {
       const vw = window.innerWidth, vh = window.innerHeight, sy = window.scrollY;
       const rect = (id: string) => document.getElementById(id)?.getBoundingClientRect();
       const ground = rect("stage-ground"), holeEl = document.getElementById("hole"), stageEl = document.getElementById("quote"),
-        fg = rect("footer-ground"), work = rect("work"), wrap = document.querySelector(".hero__top")?.getBoundingClientRect();
+        fg = rect("footer-ground"), work = rect("work"), wrap = document.querySelector("#testimonials .wrap")?.getBoundingClientRect();
       if (!ground || !holeEl || !stageEl || !fg || !work) return;
       const stageR = stageEl.getBoundingClientRect();
       const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
@@ -70,43 +70,61 @@ export default function Character() {
       const holeW = holeEl.getBoundingClientRect().width || 56;
       holeEl.style.left = `${Math.round(holeX - holeW / 2)}px`;
 
-      // Footholds: real elements near the lane he can land on and leap from.
-      // Greedy chain from the footer ground up: each leap goes to the highest
-      // element within reach, so the climb is a few big jumps, not many hops.
-      const minHop = vh * 0.3, maxHop = vh * 0.9;
-      const sel = ".card, .quote, .screen, .about__body, .proof, .work__closer, .work__end .btn, .ticker, .foot__row, h1, h2, p, img";
-      const seen = new Set<number>();
-      const cands: Platform[] = [];
-      for (const el of Array.from(document.querySelectorAll<HTMLElement>(sel))) {
-        const r = el.getBoundingClientRect();
-        if (r.width < 40 || r.height < 16) continue;
-        if (r.right < contentRight - 260) continue;           // too far from the lane
-        const docY = Math.round(r.top + sy);
-        if (docY <= heroGround + 20 || docY >= footerGround - 20) continue;
-        if (seen.has(docY)) continue;
-        seen.add(docY);
-        cands.push({ docY, x: clamp(laneX, r.left + 24, r.right - 16) });
-      }
-      cands.sort((a, b) => b.docY - a.docY);                 // bottom → top
+      // The climb ends under the hole: he hangs from the rim with his feet
+      // this far below the line, then muscles up.
+      const hangDepth = 150 * scale;
+      const hangPoint: Platform = { docY: heroGround + hangDepth, x: holeX, hang: true };
       const footholds: Platform[] = [{ docY: footerGround, x: footerX }];
-      let cur = footerGround;
-      let guard = 0;
-      while (cur - heroGround > maxHop && guard++ < 200) {
-        const reach = cands.filter((c) => c.docY < cur - minHop && c.docY >= cur - maxHop);
-        let next: Platform | undefined = reach.length ? reach[reach.length - 1] : undefined; // highest in reach
-        if (!next) {
-          const above = cands.filter((c) => c.docY < cur - minHop);
-          const nearest = above[0];
-          // Nothing within reach: one big leap to the nearest thing above, or a
-          // kick off the viewport edge if even that is too far.
-          next = nearest && cur - nearest.docY <= vh * 1.3 ? nearest : { docY: cur - maxHop, x: vw - 22 * scale };
+      if (!behind) {
+        // Wide screens: a ninja zigzag between the viewport edge and the side
+        // of the content, in long diagonal leaps.
+        const wallR = vw - 22 * scale;
+        const wallL = contentRight + 26 * scale;
+        const hopH = vh * 0.72;
+        let cur = footerGround;
+        let side: 1 | -1 = -1; // first leap goes up-left to the content edge
+        let guard = 0;
+        while (cur - hangPoint.docY > hopH * 1.25 && guard++ < 60) {
+          cur -= hopH;
+          footholds.push(side < 0 ? { docY: cur, x: wallL, wall: -1 } : { docY: cur, x: wallR, wall: 1 });
+          side = side < 0 ? 1 : -1;
         }
-        footholds.push(next);
-        cur = next.docY;
+      } else {
+        // Phones: real elements near the lane he can land on and leap from.
+        // Greedy chain from the footer ground up: each leap goes to the highest
+        // element within reach, so the climb is a few big jumps, not many hops.
+        const minHop = vh * 0.3, maxHop = vh * 0.9;
+        const sel = ".card, .quote, .screen, .about__body, .proof, .work__closer, .work__end .btn, .ticker, .foot__row, h1, h2, p, img";
+        const seen = new Set<number>();
+        const cands: Platform[] = [];
+        for (const el of Array.from(document.querySelectorAll<HTMLElement>(sel))) {
+          const r = el.getBoundingClientRect();
+          if (r.width < 40 || r.height < 16) continue;
+          if (r.right < contentRight - 260) continue;
+          const docY = Math.round(r.top + sy);
+          if (docY <= heroGround + 20 || docY >= footerGround - 20) continue;
+          if (seen.has(docY)) continue;
+          seen.add(docY);
+          cands.push({ docY, x: clamp(laneX, r.left + 24, r.right - 16) });
+        }
+        cands.sort((a, b) => b.docY - a.docY);
+        let cur = footerGround;
+        let guard = 0;
+        while (cur - hangPoint.docY > maxHop && guard++ < 200) {
+          const reach = cands.filter((c) => c.docY < cur - minHop && c.docY >= cur - maxHop);
+          let next: Platform | undefined = reach.length ? reach[reach.length - 1] : undefined;
+          if (!next) {
+            const above = cands.filter((c) => c.docY < cur - minHop);
+            const nearest = above[0];
+            next = nearest && cur - nearest.docY <= vh * 1.3 ? nearest : { docY: cur - maxHop, x: vw - 22 * scale };
+          }
+          footholds.push(next);
+          cur = next.docY;
+        }
       }
-      footholds.push({ docY: heroGround, x: standX });
+      footholds.push(hangPoint);
 
-      const layout: Layout = { vw, vh, maxScroll, scale, behind, laneX, standX, leftX, holeX, heroGround, stageStart, stageEnd, footerGround, footerX, workTop: work.top + sy, footholds };
+      const layout: Layout = { vw, vh, maxScroll, scale, behind, laneX, standX, leftX, holeX, heroGround, stageStart, stageEnd, footerGround, footerX, workTop: work.top + sy, footholds, hangDepth };
       director.layout = layout;
     };
 

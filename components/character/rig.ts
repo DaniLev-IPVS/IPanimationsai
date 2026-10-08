@@ -50,6 +50,12 @@ export const POSES = {
   hang:     P({ tR: 10, kR: 10, tL: -10, kL: 10, aR: 120, eR: 30, aL: 150, eL: 20, lean: 6, grounded: 0 }),
   /** Head-first into the hole: body tipped forward, legs together, arms along the body. */
   dive:     P({ tR: 6, kR: 6, tL: -4, kL: 6, aR: 168, eR: 6, aL: 174, eL: -6, lean: 62, head: 6, sx: 0.92, sy: 1.1, grounded: 0 }),
+  /** Hanging from the rim by both hands, legs dangling. */
+  hangRim:  P({ tR: 10, kR: 22, tL: -8, kL: 18, aR: 178, eR: 2, aL: 176, eL: -2, lean: 0, grounded: 0 }),
+  /** Halfway up: arms bent hard, elbows high, chin over the rim. */
+  pullUp:   P({ tR: 30, kR: 60, tL: -10, kL: 40, aR: 120, eR: -120, aL: 118, eL: -118, lean: 6, head: 4, grounded: 0 }),
+  /** Mantling over the edge: one knee up on the ledge, hands pressed down. */
+  mantle:   P({ tR: 85, kR: 115, tL: -30, kL: 90, aR: 40, eR: -70, aL: 38, eL: -68, lean: 36, head: 8, grounded: 0 }),
   /** Feet on a wall behind him, coiled, about to push off forward. */
   kick:     P({ tR: -55, kR: 110, tL: -70, kL: 120, aR: 40, eR: -40, aL: -30, eL: -30, lean: -18, head: 3, sx: 1.06, sy: 0.94, grounded: 0 }),
 } satisfies Record<string, Pose>;
