@@ -43,7 +43,7 @@ export default function Character() {
       const stageR = stageEl.getBoundingClientRect();
       const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
       const isMobile = vw < 768;
-      const scale = isMobile ? 0.34 : vw < 1100 ? 0.42 : 0.46;
+      const scale = isMobile ? 0.34 : vw < 1100 ? 0.42 : vw < 1440 ? 0.46 : 0.6;
       // The page's side margin. If the character fits in it he falls down the
       // right margin in front of everything; otherwise he falls behind the
       // content along the right edge and peeks out between the cards.

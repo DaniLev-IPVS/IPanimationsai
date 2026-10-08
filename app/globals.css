@@ -1358,3 +1358,95 @@ textarea.control {
     column-gap: 5rem;
   }
 }
+
+/* ── ≥ 1440: large desktops. The hero is the point of the page; let it take the room. */
+
+@media (min-width: 1440px) {
+  .hero-stage {
+    --char-room: 160px;
+  }
+  .hero-stage__flow {
+    max-width: 1480px;
+    grid-template-columns: minmax(0, 1fr) 600px;
+    column-gap: 6rem;
+  }
+  .hero-stage__head {
+    max-width: 46rem;
+    padding-top: 3.5rem;
+  }
+  .h1 {
+    font-size: clamp(3.4rem, 4.4vw, 5.6rem);
+  }
+  .hero__sub {
+    font-size: 1.4rem;
+    max-width: 36ch;
+  }
+  .offer--stage {
+    margin-top: 4rem;
+    max-width: 42rem;
+    gap: 0.9rem;
+  }
+  .offer--stage .offer__item {
+    font-size: 1.2rem;
+    grid-template-columns: 12px 1fr;
+  }
+  .offer--stage .offer__item::before {
+    width: 10px;
+    height: 10px;
+  }
+  .hero-stage__hold {
+    padding-top: 3.5rem;
+  }
+  .hero__form {
+    padding: 2rem 2rem 1.9rem;
+    border-radius: 18px;
+  }
+  .hero__formlead {
+    font-size: 1.2rem;
+    margin-bottom: 1.25rem;
+  }
+  .form {
+    gap: 1.1rem;
+  }
+  .form__row {
+    gap: 1.1rem;
+  }
+  .label {
+    font-size: 0.82rem;
+  }
+  .control {
+    min-height: 56px;
+    font-size: 18px;
+    padding: 0.85rem 1rem;
+  }
+  .control--select select {
+    min-height: 54px;
+    font-size: 18px;
+  }
+  .field__hint {
+    font-size: 0.9rem;
+  }
+  .field__toggle {
+    min-height: 44px;
+  }
+  .btn--lg {
+    min-height: 62px;
+    font-size: 1.2rem;
+  }
+  .trust {
+    font-size: 0.92rem;
+    margin-top: 1.3rem;
+  }
+  .stage .screen {
+    width: min(100%, calc((100svh - var(--top-h) - var(--band-h) - var(--char-room) - 24px) * 0.5625), 440px);
+  }
+  .hole {
+    width: 80px;
+    height: 13px;
+    top: -13px;
+    border-radius: 80px 80px 0 0 / 13px 13px 0 0;
+  }
+  .ticker__item {
+    font-size: 0.82rem;
+  }
+}
