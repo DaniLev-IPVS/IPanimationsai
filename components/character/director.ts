@@ -65,6 +65,8 @@ export type Frame = {
   attached?: boolean;
   /** Gone into the hole: draw behind the band from here on. */
   behindBand?: boolean;
+  /** Hide everything below the ground line (hanging from the rim, body in the hole). */
+  clipLine?: boolean;
 };
 
 type Mode = "down" | "up";
@@ -336,36 +338,41 @@ export class Director {
     const t = now - this.muscleT0;
     const gy = this.groundY;
     const depth = L.hangDepth;
-    this.face = -1; // facing the page, back to the edge
+    const hangX = L.footholds[L.footholds.length - 1].x; // the hole's left corner
+    this.face = 1; // facing into the hole, climbing out to the left of it
     let pose: Pose;
     let y: number;
-    let x = L.holeX;
-    if (t < 420) {
-      // Hanging, a little swing.
-      pose = { ...POSES.hangRim, lean: Math.sin(t / 140) * 4 };
+    let x = hangX;
+    const HANG = 900;
+    if (t < HANG) {
+      // Hanging off the corner by both hands, swinging, settling.
+      const sw = Math.sin(t / 150) * 11 * Math.exp(-t / 1100);
+      pose = { ...POSES.hangRim, lean: sw, tR: 10 + sw * 0.8, tL: -8 + sw * 0.8 };
       y = gy + depth;
-    } else if (t < 1100) {
-      const u = easeInOut((t - 420) / 680);
+    } else if (t < HANG + 680) {
+      const u = easeInOut((t - HANG) / 680);
       pose = u < 0.55 ? mix(POSES.hangRim, POSES.pullUp, u / 0.55) : mix(POSES.pullUp, POSES.mantle, (u - 0.55) / 0.45);
       y = gy + depth * (1 - u);
-    } else if (t < 1500) {
-      const u = easeOut((t - 1100) / 400);
+    } else if (t < HANG + 1080) {
+      const u = easeOut((t - HANG - 680) / 400);
       pose = mix(POSES.mantle, POSES.crouch, u);
       y = gy;
-      x = lerp(L.holeX, L.standX, u * 0.6);
-    } else if (t < 1850) {
-      const u = easeOut((t - 1500) / 350);
+      x = lerp(hangX, L.standX, u * 0.6);
+      if (u > 0.5) this.face = -1;
+    } else if (t < HANG + 1430) {
+      const u = easeOut((t - HANG - 1080) / 350);
       pose = mix(POSES.crouch, POSES.idle, u);
       y = gy;
-      x = lerp(L.holeX, L.standX, 0.6 + u * 0.4);
+      x = lerp(hangX, L.standX, 0.6 + u * 0.4);
+      this.face = -1;
     } else {
       this.muscleDone = true;
       return null;
     }
     const f = this.base(x, y, pose);
     f.attached = true;
-    f.behindBand = t < 1100; // below the line until he is over the edge
-    f.shadow = t >= 1100 ? 1 : 0;
+    f.clipLine = t < HANG + 680; // nothing shows below the line until he is over the edge
+    f.shadow = t >= HANG + 680 ? 1 : 0;
     return f;
   }
 
@@ -588,11 +595,14 @@ export class Director {
 
     let pose: Pose;
     if (wallHop) {
-      // Ninja: coiled against the wall, push off, sail across, hit the next wall feet first.
-      if (t < 0.12) pose = mix(POSES.kick, POSES.leap, easeOut(t / 0.12));
-      else if (t < 0.8) pose = POSES.leap;
-      else pose = mix(POSES.leap, POSES.kick, easeInOut((t - 0.8) / 0.2));
-      if (upper.hang && t > 0.75) pose = mix(pose, POSES.hangRim, (t - 0.75) / 0.25);
+      // Wall run: coiled on the wall, push off with the legs, fly with the
+      // legs driving and the arms low, swing the legs forward to plant on the
+      // next wall. Arms only go up on the very last reach for the rim.
+      if (t < 0.16) pose = mix(POSES.wallCling, POSES.wallFly, easeIn(t / 0.16));
+      else if (t < 0.62) pose = POSES.wallFly;
+      else if (t < 0.86) pose = mix(POSES.wallFly, POSES.wallReach, easeInOut((t - 0.62) / 0.24));
+      else pose = mix(POSES.wallReach, POSES.wallCling, easeInOut((t - 0.86) / 0.14));
+      if (upper.hang && t > 0.7) pose = mix(pose, POSES.hangRim, easeInOut((t - 0.7) / 0.3));
     } else {
       if (t < 0.1) pose = mix(POSES.idle, POSES.crouch, easeInOut(t / 0.1));
       else if (t < 0.24) pose = mix(POSES.crouch, POSES.leap, easeOut((t - 0.1) / 0.14));
@@ -602,16 +612,20 @@ export class Director {
       else pose = mix(POSES.crouch, POSES.idle, easeOut((t - 0.93) / 0.07));
     }
 
-    // Paused mid-leap: hover.
+    // Paused mid-leap: hover. On a wall run he tucks rather than reaching up.
     const still = now - this.lastMoveAt > 450 && t > 0.1 && t < 0.9;
     if (still) {
       const bob = Math.sin(now / 700) * 5;
-      const f = this.base(x, docY - scrollY + bob, mix(pose, POSES.hang, 0.8));
+      const hover = wallHop ? mix(POSES.wallFly, POSES.crouch, 0.45) : mix(pose, POSES.hang, 0.8);
+      const f = this.base(x, docY - scrollY + bob, hover);
       f.shadow = 0;
+      f.clipLine = !!upper.hang && t > 0.5;
       return f;
     }
     const f = this.base(x, docY - scrollY, pose);
     f.shadow = !wallHop && (t < 0.1 || t > 0.9) ? 1 : 0;
+    // Coming up under the hole: nothing shows below the line.
+    f.clipLine = !!upper.hang && t > 0.5;
     return f;
   }
 

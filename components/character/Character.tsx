@@ -72,8 +72,9 @@ export default function Character() {
 
       // The climb ends under the hole: he hangs from the rim with his feet
       // this far below the line, then muscles up.
-      const hangDepth = 150 * scale;
-      const hangPoint: Platform = { docY: heroGround + hangDepth, x: holeX, hang: true };
+      const hangDepth = 120 * scale;
+      // He hangs off the hole's left corner, hands on the rim.
+      const hangPoint: Platform = { docY: heroGround + hangDepth, x: holeX - holeW / 2 + 6 * scale, hang: true };
       const footholds: Platform[] = [{ docY: footerGround, x: footerX }];
       if (!behind) {
         // Wide screens: a ninja zigzag between the viewport edge and the side
@@ -190,6 +191,14 @@ export default function Character() {
       const phoneP = stageSec ? parseFloat(stageSec.style.getPropertyValue("--pv")) || 0 : 0;
       let f = director.update(now, window.scrollY, groundY, submitX, submitY, phoneP);
       if (!f) return;
+      // Clip at the ground line when he is in the hole: the rect covers
+      // everything above the line, in viewport space.
+      const clipG = R.clipG as SVGGElement;
+      const clipRect = R.clipRect as SVGRectElement;
+      if (f.clipLine) {
+        clipRect.setAttribute("height", String(Math.max(0, 10000 + groundY)));
+        clipG.setAttribute("clip-path", "url(#char-clip)");
+      } else clipG.removeAttribute("clip-path");
       const L = director.layout!;
       if (debugPose && POSES[debugPose]) {
         f = { ...f, x: L.vw / 2, y: L.vh / 2 + 100, pose: POSES[debugPose], opacity: 1, face: 1 };
@@ -257,6 +266,12 @@ export default function Character() {
 
   return (
     <svg ref={svgRef} className="char" aria-hidden="true" focusable="false">
+      <defs>
+        <clipPath id="char-clip" clipPathUnits="userSpaceOnUse">
+          <rect ref={set("clipRect")} x="-100" y="-10000" width="100000" height="0" />
+        </clipPath>
+      </defs>
+      <g ref={set("clipG")}>
       <g ref={gRef} className="char__g" style={{ opacity: 0 }}>
         <ellipse ref={set("shadow")} className="char__shadow" cx="60" cy={GROUND_Y + 2} rx="24" ry="4" />
         <g ref={set("burst")} className="char__burst" style={{ opacity: 0 }}>
@@ -284,6 +299,7 @@ export default function Character() {
           <polyline ref={set("legR")} className="char__near" />
           <polyline ref={set("armR")} className="char__near char__arm" />
         </g>
+      </g>
       </g>
     </svg>
   );

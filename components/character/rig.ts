@@ -56,6 +56,12 @@ export const POSES = {
   pullUp:   P({ tR: 30, kR: 60, tL: -10, kL: 40, aR: 120, eR: -120, aL: 118, eL: -118, lean: 6, head: 4, grounded: 0 }),
   /** Mantling over the edge: one knee up on the ledge, hands pressed down. */
   mantle:   P({ tR: 85, kR: 115, tL: -30, kL: 90, aR: 40, eR: -70, aL: 38, eL: -68, lean: 36, head: 8, grounded: 0 }),
+  /** Wall run: feet planted on the wall behind him, legs coiled, body leaning out, arms low. */
+  wallCling: P({ tR: -58, kR: 112, tL: -74, kL: 124, aR: 18, eR: -28, aL: -22, eL: -24, lean: -22, head: 4, sx: 1.04, sy: 0.96, grounded: 0 }),
+  /** Flight between walls: legs driving back, arms swept behind, chest forward. */
+  wallFly:   P({ tR: -70, kR: 30, tL: -40, kL: 60, aR: -46, eR: -20, aL: -58, eL: -16, lean: 34, head: 5, sx: 0.96, sy: 1.06, grounded: 0 }),
+  /** Legs swung forward to meet the next wall feet first. */
+  wallReach: P({ tR: 62, kR: 54, tL: 40, kL: 70, aR: -30, eR: -24, aL: -40, eL: -20, lean: -6, head: 4, grounded: 0 }),
   /** Feet on a wall behind him, coiled, about to push off forward. */
   kick:     P({ tR: -55, kR: 110, tL: -70, kL: 120, aR: 40, eR: -40, aL: -30, eL: -30, lean: -18, head: 3, sx: 1.06, sy: 0.94, grounded: 0 }),
 } satisfies Record<string, Pose>;
