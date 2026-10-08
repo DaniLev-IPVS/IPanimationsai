@@ -22,6 +22,11 @@ export default function LeadForm({
   const [error, setError] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   const attribution = useRef<Attribution>({});
+  // One submit = one lead. The ref blocks a double-click before the disabled
+  // button re-renders; the id survives a failed attempt, so a retry after a
+  // slow-but-delivered Zap carries the same lead_id and can be told apart.
+  const inFlight = useRef(false);
+  const leadId = useRef<string | null>(null);
 
   // Read the ad's URL parameters on landing, before any in-page navigation.
   useEffect(() => {
@@ -30,14 +35,15 @@ export default function LeadForm({
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (status === "sending") return;
+    if (inFlight.current) return;
+    inFlight.current = true;
 
     const fd = new FormData(e.currentTarget);
     setStatus("sending");
     setError(null);
-    // Shared by the browser pixel and the server's Conversions API call so Meta
-    // counts the registration once.
-    const eventId = newEventId();
+    // Also the event_id shared by the browser pixel and the server's
+    // Conversions API call, so Meta counts the registration once.
+    const eventId = (leadId.current ??= newEventId());
 
     try {
       const res = await fetch("/api/lead", {
@@ -67,6 +73,8 @@ export default function LeadForm({
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      inFlight.current = false;
     }
   }
 

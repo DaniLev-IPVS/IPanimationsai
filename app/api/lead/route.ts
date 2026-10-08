@@ -85,7 +85,12 @@ export async function POST(req: Request) {
     `From: ${sourceSection} form`,
   ].filter(Boolean).join("\n");
 
+  const eventId = body.event_id?.slice(0, 80) ?? "";
+
   const lead = {
+    // One per submission, reused if the visitor retries after an error, so a
+    // repeat with the same lead_id is the same lead (dedupe on it in the Zap).
+    lead_id: eventId,
     name,
     first_name: firstName,
     last_name: lastName,
@@ -134,7 +139,6 @@ export async function POST(req: Request) {
 
   // Only once the Zap has the lead, mirroring the pixel (which fires on success).
   // Never fails the request: the lead is already delivered.
-  const eventId = body.event_id?.slice(0, 80);
   await sendCapiEvents(
     req,
     [
