@@ -19,6 +19,7 @@ export default function LeadForm({
 }) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -100,18 +101,31 @@ export default function LeadForm({
         <Select label="It's for" name="purpose" options={[...PURPOSE_OPTIONS]} required />
       </div>
 
-      <label className="field">
-        <span className="label">
-          Anything else <em className="field__opt">optional</em>
-        </span>
+      <div className={`field field--more ${moreOpen ? "is-open" : ""}`}>
+        <button
+          type="button"
+          className="field__toggle"
+          aria-expanded={moreOpen}
+          aria-controls="lead-comment"
+          onClick={() => setMoreOpen((o) => !o)}
+        >
+          <span className="label">
+            Anything else <em className="field__opt">optional</em>
+          </span>
+          <svg width="12" height="8" viewBox="0 0 12 8" aria-hidden="true">
+            <path d="M1 1 6 6l5-5" stroke="currentColor" strokeWidth="1.8" fill="none" />
+          </svg>
+        </button>
         <textarea
+          id="lead-comment"
           name="comment"
           rows={2}
           className="control"
           placeholder="What are you making, and when do you need it?"
           enterKeyHint="done"
+          hidden={!moreOpen}
         />
-      </label>
+      </div>
 
       {/* honeypot: visually and semantically hidden from real users */}
       <div aria-hidden="true" className="hp">
