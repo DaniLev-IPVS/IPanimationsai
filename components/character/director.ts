@@ -12,7 +12,7 @@
  */
 
 import { POSES, type Pose, mix, walkPose, clamp, lerp, easeInOut, easeOut, easeIn } from "./rig";
-import { wallHopPose, contactFoot, plantPose, muscleUpFrame, MUSCLE_STAND_START, COIL, type Lead } from "./moves";
+import { wallHopPose, takeoffPose, coilPose, contactFoot, muscleUpFrame, MUSCLE_STAND_START, type Lead } from "./moves";
 
 /** Somewhere he can stand: document y of the surface, viewport x of his feet. */
 export type Platform = {
@@ -97,6 +97,7 @@ export class Director {
   private mouse = { x: 0, y: 0, has: false };
   private lastFrame: Frame | null = null;
   private climbFace: 1 | -1 = 1;
+  private climbStill = false;
   private lastMoveAt = 0;
   private walkFrom = 0;
   private lastX = NaN;
@@ -585,18 +586,26 @@ export class Director {
 
     let pose: Pose;
     let x: number;
+    // Paused mid-hop: on a wall he settles into the scrunch and waits there
+    // (feet on the wall); in the air he holds the stride.
+    const fromWall = !!lower.wall;
+    const stillFor = now - this.lastMoveAt;
+    const still = stillFor > 450 && t > (wallHop && !fromWall ? 0.2 : 0.1) && t < 0.9;
+    const settle = still ? easeInOut(clamp((stillFor - 450) / 300, 0, 1)) : 0;
     if (wallHop) {
       // Wall run, from moves.ts: a parkour stride with the lead leg
       // alternating each hop. The pushing foot stays on the wall through the
-      // push; the lead foot is on the next wall from first contact.
+      // push; the lead foot is on the next wall from first contact. The very
+      // first hop leaves the ground with a real take-off instead of a push.
       const lead: Lead = hopIndex % 2 === 0 ? "R" : "L";
-      pose = wallHopPose(t, !!upper.hang, lead);
-      const pushOffX = lower.wall ? lower.x - this.face * contactFoot(wallHopPose(0.24, false, lead), "push") * sc : lower.x;
+      pose = fromWall ? wallHopPose(t, !!upper.hang, lead) : takeoffPose(t, lead);
+      if (fromWall && t < 0.24 && settle > 0) pose = mix(pose, coilPose(lead), settle);
+      const pushEnd = fromWall ? 0.24 : 0.14;
+      const pushOffX = fromWall ? lower.x - this.face * contactFoot(wallHopPose(0.24, false, lead), "push") * sc : lower.x;
       const touchX = upper.hang ? upper.x : upper.wall ? upper.x - this.face * contactFoot(wallHopPose(0.84, false, lead), "land") * sc : upper.x;
-      if (t < 0.24 && lower.wall) x = lower.x - this.face * contactFoot(pose, "push") * sc;
+      if (t < pushEnd) x = fromWall ? lower.x - this.face * contactFoot(pose, "push") * sc : lower.x;
       else if (t > 0.84 && upper.wall && !upper.hang) x = upper.x - this.face * contactFoot(pose, "land") * sc;
-      else x = lerp(pushOffX, touchX, (t - 0.24) / 0.6);
-      void COIL; void plantPose;
+      else x = lerp(pushOffX, touchX, clamp((t - pushEnd) / (0.84 - pushEnd), 0, 1));
     } else {
       x = lerp(lower.x, upper.x, easeInOut(t));
       if (t < 0.1) pose = mix(POSES.idle, POSES.crouch, easeInOut(t / 0.1));
@@ -607,8 +616,10 @@ export class Director {
       else pose = mix(POSES.crouch, POSES.idle, easeOut((t - 0.93) / 0.07));
     }
 
-    // Paused mid-leap: hover. On a wall run he holds the flight pose.
-    const still = now - this.lastMoveAt > 450 && t > 0.1 && t < 0.9;
+    // Scroll resumed after a pause: ease out of the held pose.
+    if (this.climbStill && !still && this.lastFrame) { this.blendFrom = this.lastFrame; this.blendT0 = now; }
+    this.climbStill = still;
+
     if (still) {
       const bob = Math.sin(now / 700) * 5;
       const hover = wallHop ? pose : mix(pose, POSES.hang, 0.8);

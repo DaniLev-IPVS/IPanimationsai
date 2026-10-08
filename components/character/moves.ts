@@ -79,6 +79,26 @@ export function wallHopPose(t: number, toRim: boolean, lead: Lead = "R"): Pose {
   return mix(touch, plant, easeOut((t - 0.9) / 0.1));
 }
 
+/**
+ * The first hop of the climb: from the ground up to the first wall. A real
+ * take-off (crouch, jump, running stride) rather than a wall push, then the
+ * same reach, touch and plant as a wall hop.
+ */
+export function takeoffPose(t: number, lead: Lead = "R"): Pose {
+  const sw = lead === "L";
+  const S = (p: Pose) => (sw ? swapSides(p) : p);
+  const fly = S(FLY);
+  if (t < 0.12) return mix(POSES.idle, POSES.crouch, easeInOut(t / 0.12));
+  if (t < 0.26) return mix(POSES.crouch, S(POSES.leap), easeOut((t - 0.12) / 0.14));
+  if (t < 0.45) return mix(S(POSES.leap), fly, easeInOut((t - 0.26) / 0.19));
+  return wallHopPose(t, false, lead);
+}
+
+/** The scrunch on the wall for a given lead: where he waits if the scroll stops mid-push. */
+export function coilPose(lead: Lead): Pose {
+  return lead === "L" ? swapSides(COIL) : COIL;
+}
+
 /** Forward displacement (rig units) of the foot that is on the wall: the rearmost foot while pushing, the foremost while landing. */
 export function contactFoot(p: Pose, phase: "push" | "land"): number {
   const sk = solve(p);

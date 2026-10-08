@@ -38,7 +38,7 @@ export default function Character() {
       const vw = window.innerWidth, vh = window.innerHeight, sy = window.scrollY;
       const rect = (id: string) => document.getElementById(id)?.getBoundingClientRect();
       const ground = rect("stage-ground"), holeEl = document.getElementById("hole"), stageEl = document.getElementById("quote"),
-        fg = rect("footer-ground"), work = rect("work"), wrap = document.querySelector("#testimonials .wrap")?.getBoundingClientRect();
+        fg = rect("footer-ground"), work = rect("work"), wrapEl = document.querySelector<HTMLElement>("#testimonials .wrap"), wrap = wrapEl?.getBoundingClientRect();
       if (!ground || !holeEl || !stageEl || !fg || !work) return;
       const stageR = stageEl.getBoundingClientRect();
       const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
@@ -51,6 +51,8 @@ export default function Character() {
       const behind = gutter < 120 * scale + 12;
       const laneX = behind ? (isMobile ? vw - 36 : vw - 64) : vw - gutter / 2;
       const contentRight = wrap ? wrap.right : vw - gutter;
+      // The cards' actual right edge: the wrap's content box, inside its padding.
+      const contentEdge = wrapEl && wrap ? wrap.right - (parseFloat(getComputedStyle(wrapEl).paddingRight) || 0) : contentRight;
       const maxScroll = Math.max(0, document.documentElement.scrollHeight - vh);
       // The ground line is the top of the band stuck to the bottom of the
       // screen; its resting document y is the section's bottom minus the band.
@@ -81,7 +83,7 @@ export default function Character() {
         // Wide screens: a ninja zigzag between the viewport edge and the side
         // of the content, in long diagonal leaps.
         const wallR = vw - 22 * scale;
-        const wallL = contentRight + 26 * scale;
+        const wallL = contentEdge + 3 * scale;
         const hopH = vh * 0.72;
         let cur = footerGround;
         let side: 1 | -1 = -1; // first leap goes up-left to the content edge
