@@ -54,6 +54,8 @@ export type Frame = {
   paused: boolean;            // hovering mid-air because scrolling stopped
   /** Standing on the measured ground line (real viewport y): skip the scroll-smoothing shift. */
   attached?: boolean;
+  /** Gone into the hole: draw behind the band from here on. */
+  behindBand?: boolean;
 };
 
 type Mode = "down" | "up";
@@ -369,6 +371,7 @@ export class Director {
     const y = gy - Math.sin(travel * Math.PI) * arcH;
     const f = this.base(x, y, pose);
     f.attached = true;
+    f.behindBand = travel > 0.55; // past the apex: he drops in behind the banner
     f.shadow = q < 0.22 ? 1 : clamp(1 - travel * 2, 0, 1);
     return f;
   }

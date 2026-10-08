@@ -2,43 +2,10 @@ import { brand, hero, ticker, testimonials, reel, about } from "@/content/site";
 import ReelCard from "./ReelCard";
 import HeroStage from "./HeroStage";
 
-/** "==word==" → highlighted word. The closing dot is added by the caller. */
-function Highlight({ text }: { text: string }) {
-  const parts = text.split(/(==[^=]+==)/g);
-  return (
-    <>
-      {parts.map((p, i) =>
-        p.startsWith("==") ? (
-          <mark key={i} className="hl">
-            {p.slice(2, -2)}
-          </mark>
-        ) : (
-          <span key={i}>{p}</span>
-        ),
-      )}
-    </>
-  );
-}
-
 /* ── 01 · HERO ───────────────────────────────────────────────────────────── */
 
 export function Hero() {
-  return (
-    <>
-      <section id="top" className="hero">
-        <div className="wrap hero__top">
-          <div className="hero__copy">
-            <h1 className="h1">
-              <Highlight text={hero.headline} />
-              <span className="dot" aria-hidden="true" />
-            </h1>
-            <p className="body hero__sub">{hero.sub}</p>
-          </div>
-        </div>
-      </section>
-      <HeroStage />
-    </>
-  );
+  return <HeroStage />;
 }
 
 /* ── TICKER ──────────────────────────────────────────────────────────────── */

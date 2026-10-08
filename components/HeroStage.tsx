@@ -7,6 +7,24 @@ import Screen from "./Screen";
 import { Ticker } from "./Sections";
 import { hero } from "@/content/site";
 
+/** "==word==" → highlighted word. The closing dot is added by the caller. */
+function Highlight({ text }: { text: string }) {
+  const parts = text.split(/(==[^=]+==)/g);
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.startsWith("==") ? (
+          <mark key={i} className="hl">
+            {p.slice(2, -2)}
+          </mark>
+        ) : (
+          <span key={i}>{p}</span>
+        ),
+      )}
+    </>
+  );
+}
+
 /**
  * The hero stage. A band made of the ground line and the scrolling banner
  * sticks to the bottom of the screen for the whole section, and the
@@ -37,6 +55,11 @@ export default function HeroStage() {
     // would reach the gap beneath it. Then it scrolls on with them.
     const layout = () => {
       if (!hold || !form || !band) return;
+      // Wide screens: the form is its own sticky column beside the story; no hold.
+      if (window.innerWidth >= 1024) {
+        hold.style.height = "";
+        return;
+      }
       const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
       const gap = parseFloat(getComputedStyle(el).getPropertyValue("--points-gap")) || 40;
       const bandH = band.offsetHeight;
@@ -97,6 +120,14 @@ export default function HeroStage() {
   return (
     <section className="hero-stage" id="quote" ref={ref}>
       <div className="hero-stage__flow">
+        <div className="hero-stage__head">
+          <h1 className="h1">
+            <Highlight text={hero.headline} />
+            <span className="dot" aria-hidden="true" />
+          </h1>
+          <p className="body hero__sub">{hero.sub}</p>
+        </div>
+
         <div className="hero-stage__hold">
           <div className="hero__form" id="lead-form">
             <p className="body hero__formlead">{hero.formLead}</p>

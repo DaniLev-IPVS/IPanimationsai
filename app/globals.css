@@ -284,20 +284,14 @@ a {
   color: var(--ink);
 }
 
-/* ── hero: headline block, then the pinned stage ───────────────────────── */
+/* ── hero: the headline block (inside the stage flow) ─────────────────── */
 
-.hero {
-  position: relative;
+.hero-stage__head {
+  width: min(100%, 520px);
   padding: 1.75rem 0 1.25rem;
-}
-.hero__top {
-  display: grid;
-  gap: 1.1rem;
-}
-.hero__copy {
   text-align: center;
 }
-.hero__copy .h1 {
+.hero-stage__head .h1 {
   margin-left: auto;
   margin-right: auto;
 }
@@ -1250,9 +1244,6 @@ textarea.control {
   .top__link {
     display: inline;
   }
-  .hero {
-    padding-top: 2.5rem;
-  }
   .hero-stage {
     --char-room: 132px;
   }
@@ -1298,14 +1289,28 @@ textarea.control {
   :root {
     --gutter: 40px;
   }
-  .hero {
-    padding-top: 2.5rem;
-    padding-bottom: 1.5rem;
+  /* Wide screens: headline and story on the left, the form beside it on the
+     right, sticky for the whole hero. */
+  .hero-stage__flow {
+    grid-template-columns: minmax(0, 1fr) 460px;
+    grid-template-areas:
+      "head form"
+      "points form"
+      "phone form";
+    column-gap: 4rem;
+    justify-items: start;
+    align-items: start;
+    max-width: var(--wrap);
+    margin: 0 auto;
   }
-  .hero__copy {
+  .hero-stage__head {
+    grid-area: head;
+    width: 100%;
+    max-width: 40rem;
+    padding: 2.5rem 0 1rem;
     text-align: left;
   }
-  .hero__copy .h1,
+  .hero-stage__head .h1,
   .hero__sub {
     margin-left: 0;
     margin-right: 0;
@@ -1317,8 +1322,26 @@ textarea.control {
   .hero__sub {
     font-size: 1.15rem;
   }
+  .hero-stage__hold {
+    grid-area: form;
+    width: 100%;
+    align-self: stretch;
+    padding-top: 2.5rem;
+  }
   .hero__form {
+    top: calc(var(--top-h) + 20px);
     padding: 1.35rem 1.5rem;
+  }
+  .offer--stage {
+    grid-area: points;
+    width: 100%;
+    max-width: 36rem;
+    margin: var(--points-gap) 0 0;
+  }
+  .stage {
+    grid-area: phone;
+    justify-content: flex-start;
+    margin-top: 2.25rem;
   }
   .hole {
     width: 62px;
@@ -1329,7 +1352,8 @@ textarea.control {
 }
 
 @media (min-width: 1280px) {
-  .hero__top {
-    gap: 1.5rem;
+  .hero-stage__flow {
+    grid-template-columns: minmax(0, 1fr) 500px;
+    column-gap: 5rem;
   }
 }

@@ -64,7 +64,8 @@ export default function Character() {
       // falls down the lane, lands in it, and climbs back up it.
       const holeX = laneX;
       const standX = laneX - 78 * scale;
-      const leftX = behind ? 44 : Math.max(40, gutter / 2);
+      // Where he starts: bottom-left on phones, centre screen on wide screens.
+      const leftX = vw >= 1024 ? vw * 0.5 : 44;
       const footerX = laneX;
       const holeW = holeEl.getBoundingClientRect().width || 56;
       holeEl.style.left = `${Math.round(holeX - holeW / 2)}px`;
@@ -186,7 +187,7 @@ export default function Character() {
       // On narrow screens he falls behind the content, but while he is on the
       // hero's ground line (pointing, walking, jumping) he is in front of it,
       // so the rising phone passes behind him rather than over him.
-      svg.classList.toggle("is-front", !L.behind || !!f.attached);
+      svg.classList.toggle("is-front", !!f.attached && !f.behindBand);
 
       (R.legL as SVGPolylineElement).setAttribute("points", `${pt(sk.hip)} ${pt(sk.kneeL)} ${pt(sk.footL)}`);
       (R.armL as SVGPolylineElement).setAttribute("points", `${pt(sk.shoulder)} ${pt(sk.elbowL)} ${pt(sk.handL)}`);
