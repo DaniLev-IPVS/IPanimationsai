@@ -60,15 +60,52 @@ export default function HeroStage() {
       // sits at the band at scroll 0, so it only appears once you scroll.
       if (window.innerWidth >= 1024) {
         hold.style.height = "";
+        const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
+        const bandH = band.offsetHeight;
+        // The title stays put: it sticks at its own resting position, and the
+        // sub and the points scroll up beneath it. The phone rises to rest
+        // under the title, no taller than the form beside it.
+        const head = el.querySelector<HTMLElement>(".hero-stage__head");
+        const title = el.querySelector<HTMLElement>(".hero-stage__title");
+        if (head && title && stage) {
+          const headTop = head.getBoundingClientRect().top + window.scrollY;
+          const titleTop = headTop + (parseFloat(getComputedStyle(head).paddingTop) || 0);
+          // The title shrinks as the phone arrives: measure it at its final size.
+          const pvNow = el.style.getPropertyValue("--pv");
+          el.style.setProperty("--pv", "1");
+          const titleH = title.offsetHeight;
+          el.style.setProperty("--pv", pvNow || "0");
+          const gap = 24;
+          const phoneTop = titleTop + titleH + gap;
+          const formBottom = topH + 20 + form.offsetHeight;
+          const room = Math.min(formBottom - phoneTop, window.innerHeight - bandH - phoneTop - 12);
+          el.style.setProperty("--title-top", `${Math.round(titleTop)}px`);
+          el.style.setProperty("--phone-top", `${Math.round(phoneTop)}px`);
+          // Size by height: the bezel's aspect comes from the element itself.
+          const screen = stage.querySelector<HTMLElement>(".screen");
+          el.style.setProperty("--phone-w", "200px");
+          const ratio = screen && screen.offsetWidth ? stage.offsetHeight / screen.offsetWidth : 16 / 9;
+          el.style.setProperty("--phone-w", `${Math.floor(Math.max(260, room) / ratio)}px`);
+          // Everything parked (title, form, phone) lets go together with the
+          // band: the column ends under the phone by exactly the phone's
+          // distance below the title, and the section ends one screen later.
+          const phoneBottom = phoneTop + stage.offsetHeight;
+          el.style.setProperty("--head-pad", `${Math.round(phoneBottom - (titleTop + titleH))}px`);
+          el.style.setProperty("--char-room", `${Math.round(Math.max(90, window.innerHeight - bandH - phoneBottom))}px`);
+        }
         if (stage) {
+          // Measured un-stuck: the phone starts beneath the line at scroll 0.
           stage.style.marginTop = "";
+          stage.style.position = "static";
           const natural = stage.getBoundingClientRect().top + window.scrollY;
-          const want = window.innerHeight - band.offsetHeight + 40;
+          stage.style.position = "";
+          const want = window.innerHeight - bandH + 40;
           stage.style.marginTop = `${Math.max(36, Math.round(want - natural))}px`;
         }
         return;
       }
       if (stage) stage.style.marginTop = "";
+      for (const v of ["--title-top", "--phone-top", "--phone-w", "--head-pad", "--char-room"]) el.style.removeProperty(v);
       const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
       const gap = parseFloat(getComputedStyle(el).getPropertyValue("--points-gap")) || 40;
       const bandH = band.offsetHeight;
@@ -132,10 +169,12 @@ export default function HeroStage() {
     <section className="hero-stage" id="quote" ref={ref}>
       <div className="hero-stage__flow">
         <div className="hero-stage__head">
-          <h1 className="h1">
-            <Highlight text={hero.headline} />
-            <span className="dot" aria-hidden="true" />
-          </h1>
+          <div className="hero-stage__title">
+            <h1 className="h1">
+              <Highlight text={hero.headline} />
+              <span className="dot" aria-hidden="true" />
+            </h1>
+          </div>
           <p className="body hero__sub">{hero.sub}</p>
         </div>
 

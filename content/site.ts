@@ -35,7 +35,7 @@ export const hero = {
     { title: "Social series:", body: "clips built to grow a following." },
     { title: "Cutting edge technique:", body: "frame by frame, rigged, or AI-built." },
   ],
-  trust: ["1M+ followers built", "300M+ views", "Wooshi World", "Ethermail", "Babysnek"],
+  trust: ["1M+ followers acquired", "500M+ views", "1,000+ videos created"],
   formLead: "Tell us what you need. We reply within a day.",
   cta: "Submit",
   /**
@@ -55,8 +55,8 @@ export const hero = {
 };
 
 export const ticker = [
-  "1M+ followers built",
-  "300M+ views",
+  "1M+ followers acquired",
+  "500M+ views",
   "1,000+ animations",
   "Frame by frame",
   "Rigged",
@@ -110,11 +110,10 @@ export const testimonials = {
 
 export const about = {
   body: "We're the creative animation studio of IP Ventures. Animators first: we were storyboarding and drawing long before the models could. Today we work frame by frame, rigged, or AI-assisted, and we pick the technique per job, not per trend. Everything is designed, directed and finished by people. Tell us what you need and the person who answers is the one who will make it.",
-  // Daniel, 2026-10-07: "probably 300M+ and/or 500M+ views, 1M+ followers, 1,000+ animations".
-  // 300M+ is the conservative figure; bump to 500M+ if you'd rather.
+  // Daniel, 2026-10-08: 500M+ views, 1M+ followers acquired, 1,000+ animations.
   proof: [
-    { n: "300M+", l: "views" },
-    { n: "1M+", l: "followers built" },
+    { n: "500M+", l: "views" },
+    { n: "1M+", l: "followers acquired" },
     { n: "1,000+", l: "animations made" },
   ],
   closer:

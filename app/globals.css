@@ -1181,7 +1181,7 @@ textarea.control {
   .form {
     gap: 0.5rem;
   }
-  .trust li:nth-child(n + 3) {
+  .trust li:nth-child(n + 4) {
     display: none;
   }
   .form__row {
@@ -1298,22 +1298,51 @@ textarea.control {
      right, sticky for the whole hero. */
   .hero-stage__flow {
     grid-template-columns: minmax(0, 1fr) 460px;
-    grid-template-areas:
-      "head form"
-      "points form"
-      "phone form";
+    /* title / sub / points / phone / the rest the phone parks for */
+    grid-template-rows: auto auto auto auto var(--head-pad, 0px);
     column-gap: 4rem;
     justify-items: start;
     align-items: start;
     max-width: var(--wrap);
     margin: 0 auto;
   }
+  /* The head spans the whole left column (a subgrid), so the title can stick
+     inside it while the sub and the points scroll up beneath it. */
   .hero-stage__head {
-    grid-area: head;
+    grid-column: 1;
+    grid-row: 1 / 6;
+    display: grid;
+    grid-template-rows: subgrid;
+    align-content: start;
     width: 100%;
     max-width: 40rem;
-    padding: 2.5rem 0 1.5rem;
+    padding: 2.5rem 0 var(--head-pad, 1.5rem);
     text-align: left;
+  }
+  /* The title shrinks as the phone rises into place, leaving it more room. */
+  .hero-stage__title .h1 {
+    font-size: calc(var(--h1-size) * (1 - var(--pv) * 0.38));
+  }
+  .hero-stage__title {
+    grid-row: 1;
+    position: sticky;
+    top: var(--title-top, calc(var(--top-h) + 2.5rem));
+    z-index: 3;
+    width: 100%;
+    background: var(--paper);
+    padding-bottom: 0.35rem;
+  }
+  .hero-stage__title::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 4rem;
+    background: var(--paper);
+  }
+  .hero__sub {
+    grid-row: 2;
   }
   .hero-stage__head .h1,
   .hero__sub {
@@ -1321,14 +1350,16 @@ textarea.control {
     margin-right: 0;
   }
   .h1 {
+    --h1-size: clamp(2.6rem, 4.6vw, 4rem);
     max-width: 14ch;
-    font-size: clamp(2.6rem, 4.6vw, 4rem);
+    font-size: var(--h1-size);
   }
   .hero__sub {
     font-size: 1.15rem;
   }
   .hero-stage__hold {
-    grid-area: form;
+    grid-column: 2;
+    grid-row: 1 / 6;
     width: 100%;
     align-self: stretch;
     padding-top: 2.5rem;
@@ -1338,16 +1369,27 @@ textarea.control {
     padding: 1.35rem 1.5rem;
   }
   .offer--stage {
-    grid-area: points;
+    grid-column: 1;
+    grid-row: 3;
     width: 100%;
     max-width: 36rem;
     margin: 3.5rem 0 0;
     gap: 0.7rem;
   }
+  /* The phone rises from under the line and comes to rest under the title,
+     its bottom level with the form's. */
   .stage {
-    grid-area: phone;
+    grid-column: 1;
+    grid-row: 4;
+    align-self: start;
+    position: sticky;
+    top: var(--phone-top, 50vh);
+    z-index: 2;
     justify-content: flex-start;
     margin-top: 2.25rem;
+  }
+  .stage .screen {
+    width: var(--phone-w, 34vh);
   }
   .hole {
     width: 62px;
@@ -1380,7 +1422,8 @@ textarea.control {
     padding-top: 3.5rem;
   }
   .h1 {
-    font-size: clamp(3.4rem, 4.4vw, 5.6rem);
+    --h1-size: clamp(3.4rem, 4.4vw, 5.6rem);
+    font-size: var(--h1-size);
   }
   .hero__sub {
     font-size: 1.4rem;
@@ -1443,7 +1486,7 @@ textarea.control {
     margin-top: 1.3rem;
   }
   .stage .screen {
-    width: min(100%, calc((100svh - var(--top-h) - var(--band-h) - var(--char-room) - 24px) * 0.5625), 440px);
+    width: var(--phone-w, 40vh);
   }
   .hole {
     width: 80px;
