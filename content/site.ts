@@ -159,15 +159,16 @@ export const reel = {
 };
 
 /* ── Form options ──────────────────────────────────────────────────────────
-   These exact strings are the contract with the Zap. Do not edit.
+   These exact strings are the contract with the Zap and the Notion Lead DB
+   select options (Notion strips commas from select options, so no commas).
    ──────────────────────────────────────────────────────────────────────── */
 
 export const BUDGET_OPTIONS = [
   "$200 – $500",
-  "$500 – $5,000",
-  "$5,000 – $15,000",
-  "$15,000 – $50,000",
-  "$50,000 +",
+  "$500 – $5000",
+  "$5000 – $15000",
+  "$15000 – $50000",
+  "$50000 +",
 ] as const;
 
 export const PURPOSE_OPTIONS = [

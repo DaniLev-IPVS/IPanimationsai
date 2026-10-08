@@ -65,16 +65,37 @@ export async function POST(req: Request) {
   const hook = process.env.ZAPIER_WEBHOOK_URL;
 
   // ── the Zapier contract ────────────────────────────────────────────────
+  // Derived fields are pre-computed here so the Zap is pure field mapping:
+  // no formatter steps, no lookups.
+  const sourceSection = body.source_section === "closing" ? "closing" : "hero";
+  const [firstName, ...rest] = name.split(/\s+/);
+  const lastName = rest.join(" ");
+  const submittedAt = new Date().toISOString();
+  const summary = [
+    `New lead: ${name}`,
+    `Phone: ${phone}`,
+    `Email: ${email}`,
+    `Budget: ${budget}`,
+    `For: ${purpose}`,
+    comment ? `Note: ${comment}` : "",
+    `From: ${sourceSection} form`,
+  ].filter(Boolean).join("\n");
+
   const lead = {
     name,
+    first_name: firstName,
+    last_name: lastName,
     email,
     phone,
     budget,                                   // exact enum string, safe to branch on
     purpose,                                  // exact enum string, safe to branch on
     comment,
-    source_section: body.source_section === "closing" ? "closing" : "hero",
+    source_section: sourceSection,
+    // Matches the Notion "Source" select options verbatim.
+    source_label: sourceSection === "closing" ? "Website – closing form" : "Website – hero form",
+    summary,                                  // ready-made text for the Telegram message
     page_url: req.headers.get("referer") ?? `https://ipanimations.ai/`,
-    submitted_at: new Date().toISOString(),
+    submitted_at: submittedAt,
   };
 
   if (!hook) {
