@@ -12,6 +12,7 @@
  */
 
 import { POSES, type Pose, mix, walkPose, clamp, lerp, easeInOut, easeOut, easeIn } from "./rig";
+import { wallHopPose, footForward, muscleUpFrame, MUSCLE_STAND_START, COIL, PLANT } from "./moves";
 
 /** Somewhere he can stand: document y of the surface, viewport x of his feet. */
 export type Platform = {
@@ -65,8 +66,8 @@ export type Frame = {
   attached?: boolean;
   /** Gone into the hole: draw behind the band from here on. */
   behindBand?: boolean;
-  /** Hide everything below the ground line (hanging from the rim, body in the hole). */
-  clipLine?: boolean;
+  /** Draw in front of the content even when not standing on the line. */
+  front?: boolean;
 };
 
 type Mode = "down" | "up";
@@ -337,42 +338,31 @@ export class Director {
     if (!this.muscleT0 || this.muscleDone) return null;
     const t = now - this.muscleT0;
     const gy = this.groundY;
-    const depth = L.hangDepth;
-    const hangX = L.footholds[L.footholds.length - 1].x; // the hole's left corner
-    this.face = 1; // facing into the hole, climbing out to the left of it
-    let pose: Pose;
-    let y: number;
-    let x = hangX;
-    const HANG = 900;
-    if (t < HANG) {
-      // Hanging off the corner by both hands, swinging, settling.
-      const sw = Math.sin(t / 150) * 11 * Math.exp(-t / 1100);
-      pose = { ...POSES.hangRim, lean: sw, tR: 10 + sw * 0.8, tL: -8 + sw * 0.8 };
-      y = gy + depth;
-    } else if (t < HANG + 680) {
-      const u = easeInOut((t - HANG) / 680);
-      pose = u < 0.55 ? mix(POSES.hangRim, POSES.pullUp, u / 0.55) : mix(POSES.pullUp, POSES.mantle, (u - 0.55) / 0.45);
-      y = gy + depth * (1 - u);
-    } else if (t < HANG + 1080) {
-      const u = easeOut((t - HANG - 680) / 400);
-      pose = mix(POSES.mantle, POSES.crouch, u);
-      y = gy;
-      x = lerp(hangX, L.standX, u * 0.6);
-      if (u > 0.5) this.face = -1;
-    } else if (t < HANG + 1430) {
-      const u = easeOut((t - HANG - 1080) / 350);
-      pose = mix(POSES.crouch, POSES.idle, u);
-      y = gy;
-      x = lerp(hangX, L.standX, 0.6 + u * 0.4);
-      this.face = -1;
-    } else {
+    const sc = L.scale;
+    const cornerX = L.footholds[L.footholds.length - 1].x; // the hole's left corner
+    const m = muscleUpFrame(t);
+    if (m.done) {
       this.muscleDone = true;
       return null;
     }
+    // He faces away from the hole: the ledge is in front of him, the shaft
+    // behind. Hands on the corner carry him; then the near foot on the ledge.
+    this.face = -1;
+    let x: number, y: number;
+    const pose = m.pose;
+    if (m.anchor === "hand") {
+      x = cornerX - this.face * (m.hand[0] - 60) * sc;
+      y = gy + (194 - m.hand[1]) * sc;
+    } else {
+      const u = clamp((t - MUSCLE_STAND_START) / 420, 0, 1);
+      const footX = lerp(cornerX - 30 * sc, L.standX, easeOut(u));
+      x = footX - this.face * (m.foot[0] - 60) * sc;
+      y = gy + (194 - m.foot[1]) * sc;
+    }
     const f = this.base(x, y, pose);
     f.attached = true;
-    f.clipLine = t < HANG + 680; // nothing shows below the line until he is over the edge
-    f.shadow = t >= HANG + 680 ? 1 : 0;
+    f.front = true;
+    f.shadow = m.anchor === "foot" ? 1 : 0;
     return f;
   }
 
@@ -588,22 +578,24 @@ export class Director {
     const wallHop = !!lower.wall || !!upper.wall;
     const arcH = wallHop ? clamp(hop * 0.18, 20 * L.scale, L.vh * 0.2) : clamp(hop * 0.3, 40 * L.scale, L.vh * 0.4);
     const docY = lerp(lower.docY, upper.docY, t) - Math.sin(t * Math.PI) * arcH;
-    const x = lerp(lower.x, upper.x, easeInOut(t));
     const dx = upper.x - lower.x;
     if (Math.abs(dx) > 6) this.climbFace = dx < 0 ? -1 : 1;
     this.face = this.climbFace;
+    const sc = L.scale;
 
     let pose: Pose;
+    let x: number;
     if (wallHop) {
-      // Wall run: coiled on the wall, push off with the legs, fly with the
-      // legs driving and the arms low, swing the legs forward to plant on the
-      // next wall. Arms only go up on the very last reach for the rim.
-      if (t < 0.16) pose = mix(POSES.wallCling, POSES.wallFly, easeIn(t / 0.16));
-      else if (t < 0.62) pose = POSES.wallFly;
-      else if (t < 0.86) pose = mix(POSES.wallFly, POSES.wallReach, easeInOut((t - 0.62) / 0.24));
-      else pose = mix(POSES.wallReach, POSES.wallCling, easeInOut((t - 0.86) / 0.14));
-      if (upper.hang && t > 0.7) pose = mix(pose, POSES.hangRim, easeInOut((t - 0.7) / 0.3));
+      // Wall run, from moves.ts: coil, push with the legs, fly, swing the legs
+      // forward, plant. The feet are kept on the walls at both ends.
+      pose = wallHopPose(t, !!upper.hang);
+      const xFrom = lower.wall ? lower.x - this.face * footForward(COIL) * sc : lower.x;
+      const xTo = upper.hang ? upper.x : upper.wall ? upper.x - this.face * footForward(PLANT) * sc : upper.x;
+      if (t < 0.14 && lower.wall) x = lower.x - this.face * footForward(pose) * sc; // feet stay on the wall through the push
+      else x = lerp(lower.x - this.face * footForward(wallHopPose(0.14, false)) * sc, xTo, (t - 0.14) / 0.86);
+      void xFrom;
     } else {
+      x = lerp(lower.x, upper.x, easeInOut(t));
       if (t < 0.1) pose = mix(POSES.idle, POSES.crouch, easeInOut(t / 0.1));
       else if (t < 0.24) pose = mix(POSES.crouch, POSES.leap, easeOut((t - 0.1) / 0.14));
       else if (t < 0.82) pose = POSES.leap;
@@ -612,20 +604,20 @@ export class Director {
       else pose = mix(POSES.crouch, POSES.idle, easeOut((t - 0.93) / 0.07));
     }
 
-    // Paused mid-leap: hover. On a wall run he tucks rather than reaching up.
+    // Paused mid-leap: hover. On a wall run he holds the flight pose.
     const still = now - this.lastMoveAt > 450 && t > 0.1 && t < 0.9;
     if (still) {
       const bob = Math.sin(now / 700) * 5;
-      const hover = wallHop ? mix(POSES.wallFly, POSES.crouch, 0.45) : mix(pose, POSES.hang, 0.8);
+      const hover = wallHop ? pose : mix(pose, POSES.hang, 0.8);
       const f = this.base(x, docY - scrollY + bob, hover);
       f.shadow = 0;
-      f.clipLine = !!upper.hang && t > 0.5;
+      f.front = !!upper.hang && t > 0.5;
       return f;
     }
     const f = this.base(x, docY - scrollY, pose);
     f.shadow = !wallHop && (t < 0.1 || t > 0.9) ? 1 : 0;
-    // Coming up under the hole: nothing shows below the line.
-    f.clipLine = !!upper.hang && t > 0.5;
+    // Coming up to the hole: in front of the band so the reach is seen.
+    f.front = !!upper.hang && t > 0.5;
     return f;
   }
 
