@@ -90,6 +90,7 @@ export class Director {
   private lastX = NaN;
   private groundY = 0;
   private submitX = NaN;
+  private submitY = NaN;
   private phoneP = 0;
   /** The hop-and-point at the Submit button: start time, 0 = not playing. */
   private gestureT0 = 0;
@@ -145,11 +146,12 @@ export class Director {
     return { pinY, sPin, jumpLen, sJumpStart, sLand, landLen, sLandStart, climbOffset };
   }
 
-  update(now: number, realScroll: number, groundY: number, submitX: number, phoneP: number): Frame | null {
+  update(now: number, realScroll: number, groundY: number, submitX: number, submitY: number, phoneP: number): Frame | null {
     const L = this.layout;
     if (!L) return null;
     this.groundY = groundY;
     this.submitX = submitX;
+    this.submitY = submitY;
     this.phoneP = phoneP;
     const dt = this.lastNow ? Math.min(0.05, (now - this.lastNow) / 1000) : 1 / 60;
     this.lastNow = now;
@@ -265,24 +267,51 @@ export class Director {
   }
 
   /**
-   * Hop, land, point at the Submit button. Returns the pose and how far off
-   * the ground he is at time t (ms since the gesture started). Holds the
-   * point after it finishes.
+   * Point at the Submit button from where he stands: up-and-right when it is
+   * above-right of him, straight up when he is under it, up-and-left when he
+   * has passed it. `bob` wiggles the pointing hand.
    */
-  private gesture(t: number, breathe: number): { pose: Pose; lift: number } {
+  private pointAt(x: number, feetY: number, bob: number): Pose {
     const L = this.layout!;
-    if (t < 220) return { pose: mix(POSES.idle, POSES.crouch, easeInOut(t / 220)), lift: 0 };
-    if (t < 540) {
-      const u = (t - 220) / 320;
-      return { pose: mix(POSES.crouch, POSES.leap, easeOut(Math.min(1, u * 2))), lift: Math.sin(u * Math.PI) * 44 * L.scale };
+    let phi = 0; // degrees off straight-up, towards the facing side
+    if (!Number.isNaN(this.submitX) && !Number.isNaN(this.submitY)) {
+      const dx = this.submitX - x;
+      const dy = this.submitY - (feetY - 128 * L.scale); // from the shoulder
+      if (Math.abs(dx) > 26) this.face = dx > 0 ? 1 : -1;
+      phi = clamp((Math.atan2(Math.abs(dx), Math.max(1, -dy)) * 180) / Math.PI, 0, 100);
+      if (Math.abs(dx) <= 26) phi = Math.min(phi, 8);
     }
-    if (t < 700) return { pose: mix(POSES.leap, POSES.crouch, easeInOut((t - 540) / 160)), lift: 0 };
-    if (t < 980) return { pose: mix(POSES.crouch, POSES.pointUp, easeOut((t - 700) / 280)), lift: 0 };
-    return { pose: mix(POSES.pointUp, POSES.look, breathe * 0.12), lift: 0 };
+    const arm = 180 - phi + bob;
+    return { ...POSES.pointUp, aR: arm, eR: 2, head: 3 + phi * 0.04, lean: 2 + phi * 0.05 };
   }
 
-  private faceSubmit(x: number) {
-    if (!Number.isNaN(this.submitX)) this.face = this.submitX >= x ? 1 : -1;
+  /**
+   * The excitement jump: crouch, a real leap with a mid-air leg scramble,
+   * a landing squash, then up into the point. Returns pose and lift (px above
+   * the ground) for time t (ms since it started). Holds the point after.
+   */
+  private gesture(t: number, now: number, x: number, feetY: number): { pose: Pose; lift: number } {
+    const L = this.layout!;
+    const bob = Math.sin(now / 300) * 7; // the pointing hand bobs
+    if (t < 200) return { pose: mix(POSES.idle, POSES.crouch, easeInOut(t / 200)), lift: 0 };
+    if (t < 860) {
+      const u = (t - 200) / 660;
+      const lift = Math.sin(u * Math.PI) * 92 * L.scale;
+      // Legs scramble as if he is trying to catch himself.
+      const k = Math.sin(t / 38) * 26;
+      const air: Pose = { ...POSES.leap, tR: 22 + k, tL: -18 - k, kR: 48 + Math.abs(k), kL: 40 + Math.abs(k), aR: 150 + Math.sin(t / 60) * 10, aL: 160 - Math.sin(t / 60) * 10, lean: -4 + Math.sin(t / 90) * 6 };
+      const pose = u < 0.18 ? mix(POSES.crouch, air, easeOut(u / 0.18)) : u > 0.85 ? mix(air, POSES.brace, (u - 0.85) / 0.15) : air;
+      return { pose, lift };
+    }
+    if (t < 1010) {
+      // Landing squash.
+      const u = (t - 860) / 150;
+      const sq = Math.sin(u * Math.PI);
+      const pose = mix(POSES.brace, POSES.crouch, Math.min(1, u * 2));
+      return { pose: { ...pose, sx: 1 + sq * 0.14, sy: 1 - sq * 0.14 }, lift: 0 };
+    }
+    if (t < 1320) return { pose: mix(POSES.crouch, this.pointAt(x, feetY, 0), easeOut((t - 1010) / 310)), lift: 0 };
+    return { pose: this.pointAt(x, feetY, bob), lift: 0 };
   }
 
   private heroIdle(now: number, scrollY: number, dt: number): Frame {
@@ -296,17 +325,13 @@ export class Director {
     let lift = 0;
 
     if (p < 0.04) {
-      // Form and points phase: by the form, hop and point at Submit every few seconds.
+      // Form and points phase: by the form, pointing at Submit, with a jump of
+      // excitement every few seconds.
       x = L.leftX;
-      if (!this.gestureT0 || (now - this.gestureT0 > 3600 && stillFor > 400)) this.gestureT0 = now;
-      const g = this.gesture(now - this.gestureT0, breathe);
+      if (!this.gestureT0 || (now - this.gestureT0 > 4600 && stillFor > 400)) this.gestureT0 = now;
+      const g = this.gesture(now - this.gestureT0, now, x, gy);
       pose = g.pose;
       lift = g.lift;
-      this.faceSubmit(x);
-      if (this.mouse.has && !this.lowPower && now - this.gestureT0 > 980) {
-        const dx = clamp((this.mouse.x - x) / L.vw, -1, 1);
-        pose = { ...pose, head: pose.head + dx * 5 };
-      }
     } else if (p < 0.9) {
       // Walking across as the phone takes the screen. Pause the scroll and he
       // stops, hops, and points back at the Submit button.
@@ -322,10 +347,9 @@ export class Director {
         pose = mix(POSES.idle, walkPose(this.walkPhase), amt);
       } else if (stillFor > 550) {
         if (!this.gestureT0) this.gestureT0 = now;
-        const g = this.gesture(now - this.gestureT0, breathe);
+        const g = this.gesture(now - this.gestureT0, now, x, gy);
         pose = g.pose;
         lift = g.lift;
-        this.faceSubmit(x);
       } else {
         pose = mix(walkPose(this.walkPhase), POSES.idle, clamp(stillFor / 250, 0, 1));
       }
@@ -345,7 +369,7 @@ export class Director {
     this.lastX = x;
     const f = this.base(x, gy - lift, pose);
     f.attached = true;
-    f.shadow = lift > 0 ? clamp(1 - lift / (40 * L.scale), 0.2, 1) : pose.grounded;
+    f.shadow = lift > 0 ? clamp(1 - lift / (60 * L.scale), 0.15, 1) : pose.grounded;
     if (this.intro === "waiting") f.opacity = 0;
     void dt;
     return f;

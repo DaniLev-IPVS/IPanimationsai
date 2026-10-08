@@ -55,11 +55,20 @@ export default function HeroStage() {
     // would reach the gap beneath it. Then it scrolls on with them.
     const layout = () => {
       if (!hold || !form || !band) return;
-      // Wide screens: the form is its own sticky column beside the story; no hold.
+      // Wide screens: the form is its own sticky column beside the story; no
+      // hold. The phone starts beneath the line: push it down until its top
+      // sits at the band at scroll 0, so it only appears once you scroll.
       if (window.innerWidth >= 1024) {
         hold.style.height = "";
+        if (stage) {
+          stage.style.marginTop = "";
+          const natural = stage.getBoundingClientRect().top + window.scrollY;
+          const want = window.innerHeight - band.offsetHeight + 40;
+          stage.style.marginTop = `${Math.max(36, Math.round(want - natural))}px`;
+        }
         return;
       }
+      if (stage) stage.style.marginTop = "";
       const topH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--top-h")) || 60;
       const gap = parseFloat(getComputedStyle(el).getPropertyValue("--points-gap")) || 40;
       const bandH = band.offsetHeight;
@@ -104,6 +113,7 @@ export default function HeroStage() {
     layout();
     tick();
     document.fonts?.ready.then(onResize).catch(() => {});
+    window.addEventListener("load", onResize);
     const ro = new ResizeObserver(onResize);
     if (form) ro.observe(form);
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -111,6 +121,7 @@ export default function HeroStage() {
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("load", onResize);
       ro.disconnect();
       if (raf) cancelAnimationFrame(raf);
       document.documentElement.classList.remove("form-focus");

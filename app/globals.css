@@ -1307,7 +1307,7 @@ textarea.control {
     grid-area: head;
     width: 100%;
     max-width: 40rem;
-    padding: 2.5rem 0 1rem;
+    padding: 2.5rem 0 1.5rem;
     text-align: left;
   }
   .hero-stage__head .h1,
@@ -1336,7 +1336,8 @@ textarea.control {
     grid-area: points;
     width: 100%;
     max-width: 36rem;
-    margin: var(--points-gap) 0 0;
+    margin: 3.5rem 0 0;
+    gap: 0.7rem;
   }
   .stage {
     grid-area: phone;

@@ -167,9 +167,10 @@ export default function Character() {
       const submitEl = document.querySelector(".hero__form .btn--lg");
       const sb = submitEl?.getBoundingClientRect();
       const submitX = sb ? sb.left + sb.width / 2 : NaN;
+      const submitY = sb ? sb.top + sb.height / 2 : NaN;
       const stageSec = document.getElementById("quote");
       const phoneP = stageSec ? parseFloat(stageSec.style.getPropertyValue("--pv")) || 0 : 0;
-      let f = director.update(now, window.scrollY, groundY, submitX, phoneP);
+      let f = director.update(now, window.scrollY, groundY, submitX, submitY, phoneP);
       if (!f) return;
       const L = director.layout!;
       if (debugPose && POSES[debugPose]) {
