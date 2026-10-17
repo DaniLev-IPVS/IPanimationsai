@@ -1498,3 +1498,41 @@ textarea.control {
     font-size: 0.82rem;
   }
 }
+
+/* /reel — one video, centred, nothing to scroll past */
+.reelpage {
+  min-height: calc(100svh - var(--top-h));
+  display: flex;
+  align-items: center;
+  padding: 2rem 0 3rem;
+}
+.reelpage__wrap {
+  display: grid;
+  gap: 1.25rem;
+  justify-items: center;
+}
+.reelpage__label {
+  color: var(--paper-soft);
+}
+.reelpage__video {
+  width: 100%;
+  max-width: 960px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-card);
+  background: #000;
+  object-fit: cover;
+}
+.reelpage__end {
+  display: grid;
+  gap: 0.9rem;
+  justify-items: center;
+  margin-top: 0.5rem;
+}
+.reelpage__mail {
+  color: var(--paper-soft);
+  font-size: 0.92rem;
+  text-decoration: none;
+}
+.reelpage__mail:hover {
+  color: var(--paper);
+}
