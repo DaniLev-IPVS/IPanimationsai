@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { BUDGET_OPTIONS, PURPOSE_OPTIONS } from "@/content/site";
-import { ATTRIBUTION_KEYS } from "@/lib/attribution";
+import { ATTRIBUTION_KEYS, metaPlatform } from "@/lib/attribution";
 import { sendCapiEvents } from "@/lib/capi";
 
 /**
@@ -87,6 +87,15 @@ export async function POST(req: Request) {
 
   const eventId = body.event_id?.slice(0, 80) ?? "";
 
+  // The ads say utm_source=facebook whichever app showed them, so a Meta click
+  // gets the real one: facebook / instagram / messenger / threads /
+  // audience_network, or meta_unknown when nothing gives it away.
+  const attribution = attributionOf(body);
+  const fromMeta =
+    /^(facebook|fb|instagram|ig|meta)$/i.test(attribution.utm_source) || !!attribution.fbclid;
+  const { platform, signal } = metaPlatform(attribution, req.headers.get("user-agent"));
+  if (fromMeta) attribution.utm_source = platform ?? "meta_unknown";
+
   const lead = {
     // One per submission, reused if the visitor retries after an error, so a
     // repeat with the same lead_id is the same lead (dedupe on it in the Zap).
@@ -107,7 +116,10 @@ export async function POST(req: Request) {
     submitted_at: submittedAt,
     // Which ad it came from — empty strings when the visit wasn't from an ad,
     // so the Zap always sees every key.
-    ...attributionOf(body),
+    ...attribution,
+    // How utm_source was worked out: "ad link", "placement", "in-app browser",
+    // or empty (not from Meta, or meta_unknown).
+    platform_signal: fromMeta ? signal : "",
   };
 
   if (!hook) {
