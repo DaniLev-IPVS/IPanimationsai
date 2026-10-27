@@ -8,8 +8,11 @@ export type BusEvents = {
   "screen:on": void;
   /** The visitor touched a form field for the first time. */
   "form:start": void;
-  /** A lead was successfully submitted; eventId dedupes pixel vs server event. */
-  "lead:sent": { eventId: string };
+  /**
+   * A lead was successfully submitted; eventId dedupes pixel vs server event.
+   * qualified is false for an under-floor budget (a newsletter signup).
+   */
+  "lead:sent": { eventId: string; qualified: boolean };
   /** True while the form is the focus of the pinned hero stage. */
   "form:focus": boolean;
 };

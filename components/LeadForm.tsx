@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BUDGET_OPTIONS, PURPOSE_OPTIONS } from "@/content/site";
+import { BUDGET_OPTIONS, LOW_BUDGET, PURPOSE_OPTIONS } from "@/content/site";
 import { emit } from "@/lib/bus";
 import { captureAttribution, newEventId, type Attribution } from "@/lib/attribution";
 
@@ -21,6 +21,10 @@ export default function LeadForm({
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  // Under our floor the form turns into a newsletter signup: same fields, a
+  // plain warning under the budget, and a button that doesn't promise a quote.
+  const [budget, setBudget] = useState("");
+  const low = budget === LOW_BUDGET;
   const attribution = useRef<Attribution>({});
   // One submit = one lead. The ref blocks a double-click before the disabled
   // button re-renders; the id survives a failed attempt, so a retry after a
@@ -69,13 +73,28 @@ export default function LeadForm({
         throw new Error(body?.error ?? "Something went wrong.");
       }
       setStatus("sent");
-      emit("lead:sent", { eventId });
+      emit("lead:sent", { eventId, qualified: !low });
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       inFlight.current = false;
     }
+  }
+
+  if (status === "sent" && low) {
+    return (
+      <div className="form form--done" role="status">
+        <p className="label">You&rsquo;re on the list</p>
+        <p className="h2">
+          Thanks<span className="dot" />
+        </p>
+        <p className="body">
+          We&rsquo;ll send you our newsletter with tips and the occasional offer. If your
+          budget changes, fill the form in again and we&rsquo;ll give you a call.
+        </p>
+      </div>
+    );
   }
 
   if (status === "sent") {
@@ -124,9 +143,23 @@ export default function LeadForm({
       />
 
       <div className="form__row">
-        <Select label="Budget" name="budget" options={[...BUDGET_OPTIONS]} required />
+        <Select
+          label="Budget"
+          name="budget"
+          options={[...BUDGET_OPTIONS]}
+          required
+          onChange={setBudget}
+        />
         <Select label="It's for" name="purpose" options={[...PURPOSE_OPTIONS]} required />
       </div>
+
+      {low && (
+        <p className="form__note" role="status">
+          <strong>Heads up:</strong> our projects typically start at $400, and most land
+          between $1,000 and $5,000. At this budget we usually can&rsquo;t take on custom
+          work, so we probably won&rsquo;t call. We&rsquo;ll add you to our newsletter instead.
+        </p>
+      )}
 
       <div className={`field field--more ${moreOpen ? "is-open" : ""}`}>
         <button
@@ -161,7 +194,7 @@ export default function LeadForm({
       </div>
 
       <button className="btn btn--block btn--lg" type="submit" disabled={status === "sending"}>
-        {status === "sending" ? "Sending…" : cta}
+        {status === "sending" ? "Sending…" : low ? "Join the newsletter" : cta}
       </button>
 
       {status === "error" && (
@@ -197,17 +230,24 @@ function Select({
   name,
   options,
   required,
+  onChange,
 }: {
   label: string;
   name: string;
   options: string[];
   required?: boolean;
+  onChange?: (value: string) => void;
 }) {
   return (
     <label className="field">
       <span className="label">{label}</span>
       <div className="control control--select">
-        <select name={name} required={required} defaultValue="">
+        <select
+          name={name}
+          required={required}
+          defaultValue=""
+          onChange={(e) => onChange?.(e.target.value)}
+        >
           <option value="" disabled>
             Choose one
           </option>

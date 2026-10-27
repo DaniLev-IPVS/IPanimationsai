@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
-import { BUDGET_OPTIONS, PURPOSE_OPTIONS } from "@/content/site";
+import { BUDGET_OPTIONS, LOW_BUDGET, PURPOSE_OPTIONS } from "@/content/site";
 import { ATTRIBUTION_KEYS, metaPlatform } from "@/lib/attribution";
-import { sendCapiEvents } from "@/lib/capi";
+import { metaMatchOf, sendCapiEvents } from "@/lib/capi";
 
 /**
  * Lead capture: browser → this route → Zapier catch hook → Notion, plus a
  * CompleteRegistration + Lead to Meta's Conversions API once the Zap has it.
+ * An under-$400 budget is a newsletter signup: it still reaches the Zap (as
+ * fit "low", status "Low price Leads") but sends Meta a Lead only, so the ad
+ * sets, which optimise on CompleteRegistration, don't learn to find more.
  *
  * It goes through our own route rather than posting to Zapier from the browser
  * so that the hook URL stays out of the page source, spam gets filtered before
@@ -75,8 +78,9 @@ export async function POST(req: Request) {
   const [firstName, ...rest] = name.split(/\s+/);
   const lastName = rest.join(" ");
   const submittedAt = new Date().toISOString();
+  const low = budget === LOW_BUDGET;
   const summary = [
-    `New lead: ${name}`,
+    low ? `Low price lead (newsletter only): ${name}` : `New lead: ${name}`,
     `Phone: ${phone}`,
     `Email: ${email}`,
     `Budget: ${budget}`,
@@ -107,6 +111,9 @@ export async function POST(req: Request) {
     phone,
     budget,                                   // exact enum string, safe to branch on
     purpose,                                  // exact enum string, safe to branch on
+    fit: low ? "low" : "ok",                  // "low" = under $400, newsletter only
+    // Matches the Notion "Status" option verbatim.
+    status_label: low ? "Low price Leads" : "Lead In",
     comment,
     source_section: sourceSection,
     // Matches the Notion "Source" select options verbatim.
@@ -120,6 +127,10 @@ export async function POST(req: Request) {
     // How utm_source was worked out: "ad link", "placement", "in-app browser",
     // or empty (not from Meta, or meta_unknown).
     platform_signal: fromMeta ? signal : "",
+    // Click id, browser id and user agent as JSON, for the Notion "Meta match"
+    // column. The QualifiedLead sync sends them back so Meta can tie a booked
+    // pitch to the ad that brought it.
+    meta_match: JSON.stringify(metaMatchOf(req, attribution.fbclid || undefined)),
   };
 
   if (!hook) {
@@ -154,7 +165,7 @@ export async function POST(req: Request) {
   await sendCapiEvents(
     req,
     [
-      { name: "CompleteRegistration", id: eventId },
+      ...(low ? [] : [{ name: "CompleteRegistration", id: eventId }]),
       { name: "Lead", id: eventId && `${eventId}-lead` },
     ],
     { email, phone, firstName, lastName },

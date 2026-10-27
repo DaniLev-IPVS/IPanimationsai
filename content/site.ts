@@ -165,12 +165,16 @@ export const reel = {
    ──────────────────────────────────────────────────────────────────────── */
 
 export const BUDGET_OPTIONS = [
-  "$200 – $500",
-  "$500 – $5000",
+  "Under $400",
+  "$400 – $1000",
+  "$1000 – $5000",
   "$5000 – $15000",
   "$15000 – $50000",
   "$50000 +",
 ] as const;
+
+/** Below our floor: the form still takes it, but as a newsletter signup, not a quote. */
+export const LOW_BUDGET = "Under $400";
 
 export const PURPOSE_OPTIONS = [
   "Personal Project",

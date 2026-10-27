@@ -15,8 +15,9 @@ declare global {
  * Meta Pixel (the dataset in Events Manager). PageView fires on load; Contact
  * fires once when the visitor first touches a form field (form started); and
  * CompleteRegistration fires when the form is accepted — that's the event the
- * "Animation for hire" ad sets optimise on. Lead fires alongside it for
- * reporting. Each one is also sent server-side through the Conversions API
+ * "Animation for hire" ad sets optimise on, so it fires only for a budget at
+ * or above our floor; an under-$400 newsletter signup gets Lead alone and
+ * never counts as a win. Lead fires for every submission, for reporting. Each one is also sent server-side through the Conversions API
  * with the same eventID, so Meta counts it once.
  */
 export function MetaPixel({ id }: { id: string }) {
@@ -36,8 +37,8 @@ export function MetaPixel({ id }: { id: string }) {
       }).catch(() => {});
     });
     // /api/lead already sent the server twins of these two.
-    const offSent = on("lead:sent", ({ eventId }) => {
-      window.fbq?.("track", "CompleteRegistration", {}, { eventID: eventId });
+    const offSent = on("lead:sent", ({ eventId, qualified }) => {
+      if (qualified) window.fbq?.("track", "CompleteRegistration", {}, { eventID: eventId });
       window.fbq?.("track", "Lead", {}, { eventID: `${eventId}-lead` });
     });
     return () => {
