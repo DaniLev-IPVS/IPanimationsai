@@ -164,7 +164,7 @@ export const aboutUs = {
   label: "About us",
   title: "Animators first. Cutting-edge AI. People who care",
   body: [
-    "We're an international team based out of Miami, Florida. Our animators have been at it for over 10 years, on projects all around the world.",
+    "We're an international team based out of Miami, Florida. Our animators have been at it for over 10 years, animating for all kinds of businesses, brands and products.",
     "Our big thing: we use cutting-edge AI technology while still caring about the artists, and about you, the client. That's how we make sure we deliver the most useful, most creative and best-priced work we can.",
   ],
   image: { src: "/about/studio.webp", alt: "A busy animation studio high in a skyscraper: animators at drawing desks and screens, a storyboard wall, and a city skyline at sunset through tall windows", width: 1376, height: 768 },
