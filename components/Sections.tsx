@@ -1,11 +1,43 @@
-import { brand, hero, ticker, testimonials, reel, about } from "@/content/site";
+import { brand, ticker, testimonials, reel, about, clients, aboutUs } from "@/content/site";
 import ReelCard from "./ReelCard";
 import HeroStage from "./HeroStage";
 
 /* ── 01 · HERO ───────────────────────────────────────────────────────────── */
 
-export function Hero() {
-  return <HeroStage />;
+/** `mode="form"` on /book; `mode="cta"` on the homepage (a button to /book). */
+export function Hero({ mode = "form" }: { mode?: "form" | "cta" }) {
+  return <HeroStage mode={mode} />;
+}
+
+/* ── CLIENT LOGOS ────────────────────────────────────────────────────────── */
+
+export function ClientLogos() {
+  if (!clients.items.length) return null;
+  // Twice over, so the strip loops without a seam.
+  const items = [...clients.items, ...clients.items];
+  return (
+    <section className="clients" aria-labelledby="clients-label">
+      <p className="label clients__label" id="clients-label">
+        {clients.label}
+      </p>
+      <ul className="sr-only">
+        {clients.items.map((c) => (
+          <li key={c.name}>{c.name}</li>
+        ))}
+      </ul>
+      <div className="clients__strip" aria-hidden="true">
+        <div className="clients__track">
+          {items.map((c, i) => (
+            <span key={i} className={`clients__item clients__item--${c.shape} clients__item--${c.tone}`} title={c.name}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={c.logo} alt="" loading="lazy" decoding="async" />
+              {c.shape === "icon" && <span className="clients__name">{c.name}</span>}
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 /* ── TICKER ──────────────────────────────────────────────────────────────── */
@@ -64,7 +96,7 @@ export function Testimonials() {
 
 /* ── 03 · WORK + ABOUT ───────────────────────────────────────────────────── */
 
-export function WorkAndAbout() {
+export function WorkAndAbout({ bookHref = "#quote", bookLabel = brand.book }: { bookHref?: string; bookLabel?: string }) {
   const films = reel.features.filter((i) => i.featured);
   const shorts = reel.verticals.filter((i) => i.featured);
   return (
@@ -97,8 +129,54 @@ export function WorkAndAbout() {
 
         <div className="work__end">
           <p className="body work__closer">{about.closer}</p>
-          <a href="#quote" className="btn btn--lg">
-            {brand.book}
+          <a href={bookHref} className="btn btn--lg">
+            {bookLabel}
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── 04 · ABOUT US (homepage only) ───────────────────────────────────────── */
+
+export function AboutUs() {
+  return (
+    <section id="about-us" className="section section--paper aboutus" aria-labelledby="about-us-title">
+      <div className="wrap aboutus__wrap">
+        <figure className="aboutus__art">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={aboutUs.image.src}
+            alt={aboutUs.image.alt}
+            width={aboutUs.image.width}
+            height={aboutUs.image.height}
+            loading="lazy"
+            decoding="async"
+          />
+        </figure>
+        <div className="aboutus__copy">
+          <p className="label aboutus__label">{aboutUs.label}</p>
+          <h2 id="about-us-title" className="h2 aboutus__title">
+            {aboutUs.title}
+            <span className="dot" aria-hidden="true" />
+          </h2>
+          {aboutUs.body.map((p) => (
+            <p key={p.slice(0, 24)} className="body aboutus__body">
+              {p}
+            </p>
+          ))}
+          <ul className="aboutus__facts">
+            {aboutUs.facts.map((f) => (
+              <li key={f.l}>
+                <span className="aboutus__n">{f.n}</span>
+                <span className="label aboutus__l">{f.l}</span>
+              </li>
+            ))}
+          </ul>
+          <a href="#top" className="btn btn--lg aboutus__cta" data-to-top>
+            {aboutUs.button}
+            <span aria-hidden="true">↑</span>
           </a>
         </div>
       </div>

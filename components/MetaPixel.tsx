@@ -3,7 +3,7 @@
 import Script from "next/script";
 import { useEffect } from "react";
 import { on } from "@/lib/bus";
-import { newEventId } from "@/lib/attribution";
+import { captureAttribution, newEventId } from "@/lib/attribution";
 
 declare global {
   interface Window {
@@ -21,6 +21,12 @@ declare global {
  * with the same eventID, so Meta counts it once.
  */
 export function MetaPixel({ id }: { id: string }) {
+  // Keep the ad's URL parameters for the session on whatever page the click
+  // lands on (usually the homepage), so the form on /book still has them.
+  useEffect(() => {
+    captureAttribution();
+  }, []);
+
   useEffect(() => {
     let started = false;
     const offStart = on("form:start", () => {

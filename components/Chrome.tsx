@@ -5,7 +5,8 @@ import { brand } from "@/content/site";
 import { on } from "@/lib/bus";
 import Logo from "./Logo";
 
-export function Header() {
+/** `bookHref`: where the book button goes. "#quote" on /book (the form), "/book" elsewhere. */
+export function Header({ bookHref = "#quote", bookLabel = brand.book }: { bookHref?: string; bookLabel?: string }) {
   return (
     <header className="top">
       <a href="#top" className="top__logo" aria-label={`${brand.name} — home`}>
@@ -15,8 +16,8 @@ export function Header() {
         <a href="#work" className="top__link">
           Our work
         </a>
-        <a href="#quote" className="btn btn--sm top__cta">
-          {brand.book}
+        <a href={bookHref} className="btn btn--sm top__cta">
+          {bookLabel}
         </a>
       </nav>
     </header>
@@ -27,7 +28,7 @@ export function Header() {
  * Phone only: a bottom bar with the CTA that appears once the form has
  * scrolled out of view, and hides while the keyboard is up.
  */
-export function StickyCta() {
+export function StickyCta({ href = "#quote", label = brand.book }: { href?: string; label?: string }) {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -56,14 +57,14 @@ export function StickyCta() {
 
   return (
     <div className={`stickycta ${show ? "is-on" : ""}`} aria-hidden={!show}>
-      <a href="#quote" className="btn btn--block" tabIndex={show ? 0 : -1}>
-        {brand.book}
+      <a href={href} className="btn btn--block" tabIndex={show ? 0 : -1}>
+        {label}
       </a>
     </div>
   );
 }
 
-export function Footer() {
+export function Footer({ bookHref = "#quote", bookLabel = brand.book }: { bookHref?: string; bookLabel?: string }) {
   return (
     <footer className="foot" id="footer">
       {/* The landing zone: open ground he drops onto. */}
@@ -79,8 +80,8 @@ export function Footer() {
             {brand.domain} · {brand.tagline}
           </span>
         </div>
-        <a href="#quote" className="btn btn--sm foot__cta" id="footer-cta">
-          {brand.book}
+        <a href={bookHref} className="btn btn--sm foot__cta" id="footer-cta">
+          {bookLabel}
         </a>
       </div>
     </footer>

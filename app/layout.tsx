@@ -45,6 +45,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${display.variable} ${text.variable}`}>
       <body>
+        {/* What "#top" links land on: the header logo, and About us' book button. */}
+        <div id="top" aria-hidden="true" />
         {children}
         <MetaPixel id={brand.metaPixelId} />
       </body>

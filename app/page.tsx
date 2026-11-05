@@ -1,18 +1,22 @@
 import { Header, StickyCta, Footer } from "@/components/Chrome";
-import { Hero, Testimonials, WorkAndAbout } from "@/components/Sections";
+import { Hero, ClientLogos, Testimonials, WorkAndAbout, AboutUs } from "@/components/Sections";
 import Character from "@/components/character/Character";
+import { bookCall } from "@/content/site";
 
+/** The homepage: a button to /book where the form used to be, and About us at the end. */
 export default function Home() {
   return (
     <>
-      <Header />
+      <Header bookHref="/book" bookLabel={bookCall.short} />
       <main id="main">
-        <Hero />
+        <Hero mode="cta" />
+        <ClientLogos />
         <Testimonials />
-        <WorkAndAbout />
+        <WorkAndAbout bookHref="/book" bookLabel={bookCall.short} />
+        <AboutUs />
       </main>
-      <Footer />
-      <StickyCta />
+      <Footer bookHref="/book" bookLabel={bookCall.short} />
+      <StickyCta href="/book" label={bookCall.short} />
       <Character />
     </>
   );

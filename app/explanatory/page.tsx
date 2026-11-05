@@ -17,7 +17,7 @@ export default function ExplanatoryPage() {
           <Logo variant="colour" />
         </a>
         <nav className="top__nav">
-          <a href="/#quote" className="btn btn--sm top__cta">
+          <a href="/book" className="btn btn--sm top__cta">
             {brand.book}
           </a>
         </nav>
@@ -79,7 +79,7 @@ export default function ExplanatoryPage() {
           })}
 
           <div className="explpage__end">
-            <a href="/#quote" className="btn btn--lg">
+            <a href="/book" className="btn btn--lg">
               {brand.book}
             </a>
             <a href="/#work" className="explpage__more">

@@ -54,6 +54,19 @@ export const hero = {
   },
 };
 
+/* ── Homepage: the book-a-call card that stands where the form was ─────────
+   The form itself lives on /book. Daniel, 2026-11-05.
+   ──────────────────────────────────────────────────────────────────────── */
+
+export const bookCall = {
+  kicker: "Got a video in mind?",
+  title: "Let's talk it through.",
+  body: "Tell us what you need and we'll set up a quick call. We reply within a day.",
+  button: "Click to book a call",
+  /** The header, sticky bar and footer buttons on the homepage. */
+  short: "Book a call",
+};
+
 export const ticker = [
   "1M+ followers acquired",
   "500M+ views",
@@ -118,6 +131,69 @@ export const about = {
   ],
   closer:
     "The AI work isn't a prompt and a prayer. It's storyboarded, designed and directed like everything else here.",
+};
+
+/* ── Clients: the logo banner on / and /book ───────────────────────────────
+   Files in public/clients/ (2026-11-05). Most come from the client strip on
+   the old site (Drive: IP Ventures/Website/Logos/Our clients); EtherMail,
+   Kablan, Kabu, Betmode and Degen come from their own websites.
+   `tone`: "dark" art made for light backgrounds; "light" is white art made for
+   dark ones, which the strip inverts so the whole row reads ink-on-paper.
+   `shape`: "wordmark" stands alone; "icon" is a small mark set beside the name.
+   ──────────────────────────────────────────────────────────────────────── */
+
+export type Client = {
+  name: string;
+  logo: string;
+  tone: "dark" | "light";
+  shape: "wordmark" | "icon";
+};
+
+export const clients: { label: string; items: Client[] } = {
+  label: "Brands and creators we've animated for",
+  items: [
+    { name: "EtherMail", logo: "/clients/ethermail.svg", tone: "dark", shape: "wordmark" },
+    { name: "Bonk", logo: "/clients/bonk.png", tone: "light", shape: "wordmark" },
+    { name: "Pudgy Penguins", logo: "/clients/pudgy-penguins.png", tone: "light", shape: "wordmark" },
+    { name: "Magic Eden", logo: "/clients/magic-eden.png", tone: "light", shape: "wordmark" },
+    { name: "Kablan", logo: "/clients/kablan.png", tone: "dark", shape: "wordmark" },
+    { name: "BabySnek", logo: "/clients/babysnek.png", tone: "dark", shape: "wordmark" },
+    { name: "Wooshi World", logo: "/clients/wooshi-world.png", tone: "dark", shape: "icon" },
+    // Barry the Player is Betmode's mascot.
+    { name: "Betmode", logo: "/clients/betmode.png", tone: "light", shape: "wordmark" },
+    { name: "Degen", logo: "/clients/degen.svg", tone: "dark", shape: "icon" },
+    { name: "Kabu", logo: "/clients/kabu.svg", tone: "dark", shape: "wordmark" },
+    { name: "Snek", logo: "/clients/snek.svg", tone: "light", shape: "wordmark" },
+    { name: "Dogepound", logo: "/clients/dogepound.svg", tone: "light", shape: "wordmark" },
+    { name: "BabyDoge", logo: "/clients/babydoge.png", tone: "light", shape: "wordmark" },
+    { name: "Ponke", logo: "/clients/ponke.png", tone: "dark", shape: "wordmark" },
+    { name: "Chimpers", logo: "/clients/chimpers.png", tone: "light", shape: "wordmark" },
+    { name: "Pucca", logo: "/clients/pucca.png", tone: "light", shape: "wordmark" },
+    { name: "RIPNDIP", logo: "/clients/ripndip.png", tone: "light", shape: "wordmark" },
+    { name: "The Plooshies", logo: "/clients/plooshies.png", tone: "light", shape: "wordmark" },
+    { name: "Out of the Nest", logo: "/clients/out-of-the-nest.png", tone: "light", shape: "wordmark" },
+    { name: "Midnight Club", logo: "/clients/midnight-club.png", tone: "light", shape: "wordmark" },
+    { name: "Koi", logo: "/clients/koi.png", tone: "light", shape: "wordmark" },
+  ],
+};
+
+/* ── About us: the last section on the homepage ─────────────────────────── */
+
+export const aboutUs = {
+  label: "About us",
+  title: "Animators first. Cutting-edge AI. People who care",
+  body: [
+    "We're an international team based out of Miami, Florida. Our animators have been at it for over 10 years, on projects all around the world.",
+    "Our big thing: we use cutting-edge AI technology while still caring about the artists, and about you, the client. That's how we make sure we deliver the most useful, most creative and best-priced work we can.",
+  ],
+  facts: [
+    { n: "Miami, FL", l: "home base" },
+    { n: "10+ years", l: "animating" },
+    { n: "Worldwide", l: "team and clients" },
+  ],
+  image: { src: "/about/animator.webp", alt: "An illustrated animator, brush raised, painting a swirl of light in her studio", width: 800, height: 1000 },
+  /** Takes you back up to the "Click to book a call" card. */
+  button: "Book a call with us",
 };
 
 export type Technique = "HANDMADE" | "AI";
