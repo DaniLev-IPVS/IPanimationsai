@@ -1509,33 +1509,71 @@ textarea.control {
   }
 }
 
-/* /reel — the page we send prospects: one highlighted section per piece */
+/* /reel — one video, centred, nothing to scroll past */
 .reelpage {
   min-height: calc(100svh - var(--top-h));
-  padding: 2.5rem 0 4rem;
+  display: flex;
+  align-items: center;
+  padding: 2rem 0 3rem;
 }
 .reelpage__wrap {
   display: grid;
+  gap: 1.25rem;
+  justify-items: center;
+}
+.reelpage__label {
+  color: var(--paper-soft);
+}
+.reelpage__video {
+  width: 100%;
+  max-width: 960px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-card);
+  background: #000;
+  object-fit: cover;
+}
+.reelpage__end {
+  display: grid;
+  gap: 0.9rem;
+  justify-items: center;
+  margin-top: 0.5rem;
+}
+.reelpage__mail {
+  color: var(--paper-soft);
+  font-size: 0.92rem;
+  text-decoration: none;
+}
+.reelpage__mail:hover {
+  color: var(--paper);
+}
+
+/* /explanatory — the page we send prospects: one highlighted section per piece */
+.explpage {
+  min-height: calc(100svh - var(--top-h));
+  padding: 2.5rem 0 4rem;
+}
+.explpage__wrap {
+  display: grid;
   gap: 1.75rem;
 }
-.reelpage__intro {
+.explpage__intro {
   display: grid;
   gap: 0.9rem;
   justify-items: center;
   text-align: center;
   margin-bottom: 0.5rem;
 }
-.reelpage__label {
+.explpage__label {
   color: var(--paper-soft);
 }
-.reelpage__jump {
+.explpage__jump {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.5rem;
   margin-top: 0.4rem;
 }
-.reelpage__chip {
+.explpage__chip {
   display: inline-flex;
   align-items: center;
   gap: 0.5em;
@@ -1549,11 +1587,11 @@ textarea.control {
   text-decoration: none;
   transition: border-color 160ms var(--ease), background 160ms var(--ease);
 }
-.reelpage__chip:hover {
+.explpage__chip:hover {
   border-color: var(--sunbeam);
   background: var(--charcoal-2);
 }
-.reelpage__chipnum,
+.explpage__chipnum,
 .reelhl__num {
   display: inline-grid;
   place-items: center;
@@ -1638,23 +1676,23 @@ textarea.control {
   }
 }
 
-.reelpage__end {
+.explpage__end {
   display: grid;
   gap: 0.9rem;
   justify-items: center;
   margin-top: 1rem;
 }
-.reelpage__more {
+.explpage__more {
   color: var(--paper);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
-.reelpage__mail {
+.explpage__mail {
   color: var(--paper-soft);
   font-size: 0.92rem;
   text-decoration: none;
 }
-.reelpage__mail:hover {
+.explpage__mail:hover {
   color: var(--paper);
 }

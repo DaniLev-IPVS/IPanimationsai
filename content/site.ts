@@ -159,14 +159,14 @@ export const reel = {
   ] as ReelItem[],
 };
 
-/* ── /reel highlights ──────────────────────────────────────────────────────
+/* ── /explanatory highlights ──────────────────────────────────────────────────────
    The page we send to prospects: each piece gets its own highlighted section
-   with an anchor (/reel#kablan-tile), so an email can link straight to one.
+   with an anchor (/explanatory#kablan-tile), so an email can link straight to one.
    `src` / `poster` are R2 keys, like the reel items above.
    ──────────────────────────────────────────────────────────────────────── */
 
 export type ReelHighlight = {
-  /** Anchor id: /reel#<id>. */
+  /** Anchor id: /explanatory#<id>. */
   id: string;
   kind: string;
   title: string;
