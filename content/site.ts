@@ -162,10 +162,12 @@ export const clients: { label: string; items: Client[] } = {
 
 export const aboutUs = {
   label: "About us",
-  title: "Animators first. Cutting-edge AI. People who care",
+  title: "We make videos that are genuinely useful to the people watching them",
+  /** The first paragraph is the lead: it sits larger, in ink. */
   body: [
+    "That's our key thing: we're usefulness-first. Before anything else, we make sure every video actually helps the person on the other side of the screen, not just looks nice.",
     "We're an international team based out of Miami, Florida. Our animators have been at it for over 10 years, animating for all kinds of businesses, brands and products.",
-    "Our big thing: we use cutting-edge AI technology while still caring about the artists, and about you, the client. That's how we make sure we deliver the most useful, most creative and best-priced work we can.",
+    "We use cutting-edge AI technology while still caring about the artists, and about you, the client. That's how we make sure we deliver the most useful, most creative and best-priced work we can.",
   ],
   image: { src: "/about/studio.webp", alt: "A busy animation studio high in a skyscraper: animators at drawing desks and screens, a storyboard wall, and a city skyline at sunset through tall windows", width: 1376, height: 768 },
   /** Takes you back up to the "Click to book a call" button. */

@@ -143,8 +143,8 @@ export function AboutUs() {
             {aboutUs.title}
             <span className="dot" aria-hidden="true" />
           </h2>
-          {aboutUs.body.map((p) => (
-            <p key={p.slice(0, 24)} className="body aboutus__body">
+          {aboutUs.body.map((p, i) => (
+            <p key={p.slice(0, 24)} className={`body aboutus__body${i === 0 ? " aboutus__lead" : ""}`}>
               {p}
             </p>
           ))}

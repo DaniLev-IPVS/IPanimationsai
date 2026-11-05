@@ -1799,10 +1799,17 @@ textarea.control {
 }
 .aboutus__title {
   margin: 0 auto;
+  max-width: 24ch;
+  text-wrap: balance;
 }
 .aboutus__body {
   max-width: 56ch;
   font-size: 1.05rem;
+}
+.aboutus__lead {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 1.15rem;
 }
 .aboutus__cta {
   margin-top: 1rem;
@@ -1955,6 +1962,9 @@ textarea.control {
   .aboutus__body {
     font-size: 1.1rem;
   }
+  .aboutus__lead {
+    font-size: 1.25rem;
+  }
   .aboutus__cta {
     margin-top: 0.75rem;
   }
@@ -1968,6 +1978,9 @@ textarea.control {
   }
   .aboutus__body {
     font-size: 1.2rem;
+  }
+  .aboutus__lead {
+    font-size: 1.35rem;
   }
 }
 
