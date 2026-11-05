@@ -159,6 +159,55 @@ export const reel = {
   ] as ReelItem[],
 };
 
+/* ── /reel highlights ──────────────────────────────────────────────────────
+   The page we send to prospects: each piece gets its own highlighted section
+   with an anchor (/reel#kablan-tile), so an email can link straight to one.
+   `src` / `poster` are R2 keys, like the reel items above.
+   ──────────────────────────────────────────────────────────────────────── */
+
+export type ReelHighlight = {
+  /** Anchor id: /reel#<id>. */
+  id: string;
+  kind: string;
+  title: string;
+  blurb: string;
+  src: string;
+  poster: string;
+  /** CSS aspect-ratio of the video. */
+  aspect: "16 / 9" | "1 / 1";
+};
+
+export const reelHighlights: ReelHighlight[] = [
+  {
+    id: "showreel",
+    kind: "Showreel",
+    title: "The full reel",
+    blurb: "Twenty seconds across the work: handmade, 3D and AI animation.",
+    src: "reel/sizzle-wide-v2.mp4",
+    poster: "reel/sizzle-wide-v2.jpg",
+    aspect: "16 / 9",
+  },
+  {
+    id: "kablan-tile",
+    kind: "Product explainer",
+    title: "Kablan Tile: how a tiled floor is built",
+    blurb:
+      "A friendly installer pulls a floor apart layer by layer (subfloor, concrete, Italian tile) and explains each one, then puts it back together.",
+    src: "reel/kablan-tile-explainer.mp4",
+    poster: "reel/kablan-tile-explainer.jpg",
+    aspect: "16 / 9",
+  },
+  {
+    id: "ethermail",
+    kind: "Product promo",
+    title: "Ethermail: New Tools",
+    blurb: "A launch promo for Ethermail's new features: email as a wallet, card payments and Paymail.",
+    src: "reel/ethermail-new-tools.mp4",
+    poster: "reel/ethermail-new-tools.jpg",
+    aspect: "1 / 1",
+  },
+];
+
 /* ── Form options ──────────────────────────────────────────────────────────
    These exact strings are the contract with the Zap and the Notion Lead DB
    select options (Notion strips commas from select options, so no commas).

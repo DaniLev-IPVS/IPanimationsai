@@ -1509,34 +1509,146 @@ textarea.control {
   }
 }
 
-/* /reel — one video, centred, nothing to scroll past */
+/* /reel — the page we send prospects: one highlighted section per piece */
 .reelpage {
   min-height: calc(100svh - var(--top-h));
-  display: flex;
-  align-items: center;
-  padding: 2rem 0 3rem;
+  padding: 2.5rem 0 4rem;
 }
 .reelpage__wrap {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.75rem;
+}
+.reelpage__intro {
+  display: grid;
+  gap: 0.9rem;
   justify-items: center;
+  text-align: center;
+  margin-bottom: 0.5rem;
 }
 .reelpage__label {
   color: var(--paper-soft);
 }
-.reelpage__video {
+.reelpage__jump {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+.reelpage__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  min-height: 40px;
+  padding: 0 0.95rem 0 0.4rem;
+  border: 1px solid var(--line-dark);
+  border-radius: 999px;
+  color: var(--paper);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 160ms var(--ease), background 160ms var(--ease);
+}
+.reelpage__chip:hover {
+  border-color: var(--sunbeam);
+  background: var(--charcoal-2);
+}
+.reelpage__chipnum,
+.reelhl__num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2em;
+  height: 2em;
+  padding: 0 0.35em;
+  border-radius: 999px;
+  background: var(--sunbeam);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+/* each piece: a highlighted card, video + text */
+.reelhl {
+  display: grid;
+  gap: 1.1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line-dark);
+  border-radius: calc(var(--r-card) + 6px);
+  background: var(--charcoal-2);
+  scroll-margin-top: calc(var(--top-h) + 16px);
+}
+.reelhl:target {
+  border-color: var(--sunbeam);
+  box-shadow: 0 0 0 1px var(--sunbeam);
+}
+.reelhl__video {
+  display: block;
   width: 100%;
-  max-width: 960px;
-  aspect-ratio: 16 / 9;
   border-radius: var(--r-card);
   background: #000;
   object-fit: cover;
 }
+.reelhl--square .reelhl__media {
+  width: 100%;
+  max-width: 560px;
+  justify-self: center;
+}
+.reelhl__text {
+  display: grid;
+  gap: 0.6rem;
+  align-content: center;
+  padding: 0 0.5rem 0.75rem;
+}
+.reelhl__kind {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  color: var(--paper-soft);
+}
+.reelhl__title {
+  font-family: var(--font-display), var(--font-text), sans-serif;
+  font-weight: 800;
+  font-size: clamp(1.3rem, 3.2vw, 1.9rem);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  margin: 0;
+  max-width: 22ch;
+}
+
+@media (min-width: 1024px) {
+  .reelhl {
+    grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+    gap: 2rem;
+    padding: 1rem;
+  }
+  /* alternate sides; the video keeps the wide column */
+  .reelhl:nth-of-type(even) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.65fr);
+  }
+  .reelhl:nth-of-type(even) .reelhl__media {
+    order: 2;
+  }
+  .reelhl--square,
+  .reelhl--square:nth-of-type(even) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .reelhl__text {
+    padding: 0.5rem 1rem 0.5rem 0.25rem;
+  }
+}
+
 .reelpage__end {
   display: grid;
   gap: 0.9rem;
   justify-items: center;
-  margin-top: 0.5rem;
+  margin-top: 1rem;
+}
+.reelpage__more {
+  color: var(--paper);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .reelpage__mail {
   color: var(--paper-soft);
