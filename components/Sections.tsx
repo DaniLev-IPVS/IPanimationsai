@@ -1,26 +1,26 @@
-import { brand, ticker, testimonials, reel, about, clients, aboutUs } from "@/content/site";
+import { brand, testimonials, reel, about, clients, aboutUs } from "@/content/site";
 import ReelCard from "./ReelCard";
 import HeroStage from "./HeroStage";
+import HomeHero from "./HomeHero";
 
 /* ── 01 · HERO ───────────────────────────────────────────────────────────── */
 
 /** `mode="form"` on /book; `mode="cta"` on the homepage (a button to /book). */
 export function Hero({ mode = "form" }: { mode?: "form" | "cta" }) {
-  return <HeroStage mode={mode} />;
+  return mode === "cta" ? <HomeHero /> : <HeroStage />;
 }
 
-/* ── CLIENT LOGOS ────────────────────────────────────────────────────────── */
+/* ── CLIENT LOGOS: the running banner in the hero's band ─────────────────── */
 
-export function ClientLogos() {
-  if (!clients.items.length) return null;
+export function LogoStrip() {
   // Twice over, so the strip loops without a seam.
   const items = [...clients.items, ...clients.items];
   return (
-    <section className="clients" aria-labelledby="clients-label">
-      <p className="label clients__label" id="clients-label">
+    <div className="bandlogos">
+      <p className="label bandlogos__label" id="clients-label">
         {clients.label}
       </p>
-      <ul className="sr-only">
+      <ul className="sr-only" aria-labelledby="clients-label">
         {clients.items.map((c) => (
           <li key={c.name}>{c.name}</li>
         ))}
@@ -30,29 +30,11 @@ export function ClientLogos() {
           {items.map((c, i) => (
             <span key={i} className={`clients__item clients__item--${c.shape} clients__item--${c.tone}`} title={c.name}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.logo} alt="" loading="lazy" decoding="async" />
+              <img src={c.logo} alt="" decoding="async" />
               {c.shape === "icon" && <span className="clients__name">{c.name}</span>}
             </span>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── TICKER ──────────────────────────────────────────────────────────────── */
-
-export function Ticker() {
-  const items = [...ticker, ...ticker];
-  return (
-    <div className="ticker" aria-hidden="true" data-platform>
-      <div className="ticker__track">
-        {items.map((t, i) => (
-          <span key={i} className="ticker__item">
-            {t}
-            <span className="ticker__dot" />
-          </span>
-        ))}
       </div>
     </div>
   );
@@ -166,15 +148,7 @@ export function AboutUs() {
               {p}
             </p>
           ))}
-          <ul className="aboutus__facts">
-            {aboutUs.facts.map((f) => (
-              <li key={f.l}>
-                <span className="aboutus__n">{f.n}</span>
-                <span className="label aboutus__l">{f.l}</span>
-              </li>
-            ))}
-          </ul>
-          <a href="#top" className="btn btn--lg aboutus__cta" data-to-top>
+          <a href="#top" className="btn btn--lg aboutus__cta">
             {aboutUs.button}
             <span aria-hidden="true">↑</span>
           </a>

@@ -98,7 +98,7 @@ export default function Character() {
         // Greedy chain from the footer ground up: each leap goes to the highest
         // element within reach, so the climb is a few big jumps, not many hops.
         const minHop = vh * 0.3, maxHop = vh * 0.9;
-        const sel = ".card, .quote, .screen, .about__body, .proof, .work__closer, .work__end .btn, .ticker, .foot__row, h1, h2, p, img";
+        const sel = ".card, .quote, .screen, .about__body, .proof, .work__closer, .work__end .btn, .bandlogos, .foot__row, h1, h2, p, img";
         const seen = new Set<number>();
         const cands: Platform[] = [];
         for (const el of Array.from(document.querySelectorAll<HTMLElement>(sel))) {
@@ -186,7 +186,7 @@ export default function Character() {
 
       const groundEl = document.getElementById("stage-ground");
       const groundY = groundEl ? groundEl.getBoundingClientRect().top : 0;
-      const submitEl = document.querySelector(".hero__form .btn--lg");
+      const submitEl = document.querySelector(".hero__form .btn--lg, .hero-home__cta");
       const sb = submitEl?.getBoundingClientRect();
       const submitX = sb ? sb.left + sb.width / 2 : NaN;
       const submitY = sb ? sb.top + sb.height / 2 : NaN;

@@ -1,5 +1,5 @@
 import { Header, StickyCta, Footer } from "@/components/Chrome";
-import { Hero, ClientLogos, Testimonials, WorkAndAbout, AboutUs } from "@/components/Sections";
+import { Hero, Testimonials, WorkAndAbout, AboutUs } from "@/components/Sections";
 import Character from "@/components/character/Character";
 import { bookCall } from "@/content/site";
 
@@ -10,7 +10,6 @@ export default function Home() {
       <Header bookHref="/book" bookLabel={bookCall.short} />
       <main id="main">
         <Hero mode="cta" />
-        <ClientLogos />
         <Testimonials />
         <WorkAndAbout bookHref="/book" bookLabel={bookCall.short} />
         <AboutUs />

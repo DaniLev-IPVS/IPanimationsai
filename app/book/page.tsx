@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Header, StickyCta, Footer } from "@/components/Chrome";
-import { Hero, ClientLogos, Testimonials, WorkAndAbout } from "@/components/Sections";
+import { Hero, Testimonials, WorkAndAbout } from "@/components/Sections";
 import Character from "@/components/character/Character";
 import { brand } from "@/content/site";
 
@@ -16,7 +16,6 @@ export default function BookPage() {
       <Header />
       <main id="main">
         <Hero mode="form" />
-        <ClientLogos />
         <Testimonials />
         <WorkAndAbout />
       </main>

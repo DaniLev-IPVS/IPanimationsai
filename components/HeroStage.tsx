@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 import { emit } from "@/lib/bus";
 import LeadForm from "./LeadForm";
 import Screen from "./Screen";
-import { Ticker } from "./Sections";
-import { hero, bookCall } from "@/content/site";
+import { LogoStrip } from "./Sections";
+import { hero } from "@/content/site";
 
 /** "==word==" → highlighted word. The closing dot is added by the caller. */
 function Highlight({ text }: { text: string }) {
@@ -36,7 +36,7 @@ function Highlight({ text }: { text: string }) {
  * --pv on the section is the phone's rise, 0 (under the line) to 1 (fully
  * up). The character engine reads it; the styles do the phone's transform.
  */
-export default function HeroStage({ mode = "form" }: { mode?: "form" | "cta" }) {
+export default function HeroStage() {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -78,10 +78,7 @@ export default function HeroStage({ mode = "form" }: { mode?: "form" | "cta" }) 
           const gap = 24;
           const phoneTop = titleTop + titleH + gap;
           const formBottom = topH + 20 + form.offsetHeight;
-          // The book-a-call card is short: the phone takes the screen's room
-          // instead of stopping level with the card's bottom.
-          const screenRoom = window.innerHeight - bandH - phoneTop - 12;
-          const room = form.dataset.mode === "cta" ? screenRoom : Math.min(formBottom - phoneTop, screenRoom);
+          const room = Math.min(formBottom - phoneTop, window.innerHeight - bandH - phoneTop - 12);
           el.style.setProperty("--title-top", `${Math.round(titleTop)}px`);
           el.style.setProperty("--phone-top", `${Math.round(phoneTop)}px`);
           // Size by height: the bezel's aspect comes from the element itself.
@@ -182,32 +179,15 @@ export default function HeroStage({ mode = "form" }: { mode?: "form" | "cta" }) 
         </div>
 
         <div className="hero-stage__hold">
-          {mode === "form" ? (
-            <div className="hero__form" id="lead-form" data-mode="form">
-              <p className="body hero__formlead">{hero.formLead}</p>
-              <LeadForm source="hero" cta={hero.cta} />
-              <ul className="trust" aria-label="Clients and results">
-                {hero.trust.map((t) => (
-                  <li key={t}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <div className="hero__form hero__form--cta" id="book-cta" data-mode="cta">
-              <p className="label hero__ctakicker">{bookCall.kicker}</p>
-              <p className="hero__ctatitle">{bookCall.title}</p>
-              <p className="body hero__ctabody">{bookCall.body}</p>
-              <a href="/book" className="btn btn--lg btn--block hero__ctabtn">
-                {bookCall.button}
-                <span aria-hidden="true">→</span>
-              </a>
-              <ul className="trust" aria-label="Clients and results">
-                {hero.trust.map((t) => (
-                  <li key={t}>{t}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="hero__form" id="lead-form">
+            <p className="body hero__formlead">{hero.formLead}</p>
+            <LeadForm source="hero" cta={hero.cta} />
+            <ul className="trust" aria-label="Clients and results">
+              {hero.trust.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         <ul className="offer offer--stage">
@@ -232,7 +212,7 @@ export default function HeroStage({ mode = "form" }: { mode?: "form" | "cta" }) 
         <div className="hole" id="hole" aria-hidden="true">
           <span className="hole__rim" />
         </div>
-        <Ticker />
+        <LogoStrip />
       </div>
     </section>
   );

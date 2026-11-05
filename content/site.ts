@@ -54,32 +54,13 @@ export const hero = {
   },
 };
 
-/* ── Homepage: the book-a-call card that stands where the form was ─────────
-   The form itself lives on /book. Daniel, 2026-11-05.
-   ──────────────────────────────────────────────────────────────────────── */
+/* ── Homepage: the book-a-call button where the form was. The form is on /book. */
 
 export const bookCall = {
-  kicker: "Got a video in mind?",
-  title: "Let's talk it through.",
-  body: "Tell us what you need and we'll set up a quick call. We reply within a day.",
   button: "Click to book a call",
   /** The header, sticky bar and footer buttons on the homepage. */
   short: "Book a call",
 };
-
-export const ticker = [
-  "1M+ followers acquired",
-  "500M+ views",
-  "1,000+ animations",
-  "Frame by frame",
-  "Rigged",
-  "AI-assisted",
-  "Explainers",
-  "Trailers",
-  "Social series",
-  "Intros",
-  "Characters",
-];
 
 /* ── 02 · Testimonials ─────────────────────────────────────────────────────
    Real client quotes, supplied 2026-09-21, tightened 2026-10-07. Ellipses mark
@@ -186,13 +167,8 @@ export const aboutUs = {
     "We're an international team based out of Miami, Florida. Our animators have been at it for over 10 years, on projects all around the world.",
     "Our big thing: we use cutting-edge AI technology while still caring about the artists, and about you, the client. That's how we make sure we deliver the most useful, most creative and best-priced work we can.",
   ],
-  facts: [
-    { n: "Miami, FL", l: "home base" },
-    { n: "10+ years", l: "animating" },
-    { n: "Worldwide", l: "team and clients" },
-  ],
-  image: { src: "/about/animator.webp", alt: "An illustrated animator, brush raised, painting a swirl of light in her studio", width: 800, height: 1000 },
-  /** Takes you back up to the "Click to book a call" card. */
+  image: { src: "/about/studio.webp", alt: "A busy animation studio high in a skyscraper: animators at drawing desks and screens, a storyboard wall, and a city skyline at sunset through tall windows", width: 1376, height: 768 },
+  /** Takes you back up to the "Click to book a call" button. */
   button: "Book a call with us",
 };
 
