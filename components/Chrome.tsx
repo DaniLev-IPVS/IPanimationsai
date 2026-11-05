@@ -64,11 +64,20 @@ export function StickyCta({ href = "#quote", label = brand.book }: { href?: stri
   );
 }
 
-export function Footer({ bookHref = "#quote", bookLabel = brand.book }: { bookHref?: string; bookLabel?: string }) {
+/** `plain`: no landing zone above it, for pages without the character. */
+export function Footer({
+  bookHref = "#quote",
+  bookLabel = brand.book,
+  plain = false,
+}: {
+  bookHref?: string;
+  bookLabel?: string;
+  plain?: boolean;
+}) {
   return (
     <footer className="foot" id="footer">
       {/* The landing zone: open ground he drops onto. */}
-      <div className="foot__sky" aria-hidden="true" />
+      {!plain && <div className="foot__sky" aria-hidden="true" />}
       <div className="foot__ground" id="footer-ground" data-platform aria-hidden="true" />
       <div className="wrap foot__row">
         <Logo variant="mono" className="foot__logo" />
@@ -79,6 +88,10 @@ export function Footer({ bookHref = "#quote", bookLabel = brand.book }: { bookHr
           <span className="foot__dim">
             {brand.domain} · {brand.tagline}
           </span>
+          <nav className="foot__legal" aria-label="Legal">
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms of Service</a>
+          </nav>
         </div>
         <a href={bookHref} className="btn btn--sm foot__cta" id="footer-cta">
           {bookLabel}
