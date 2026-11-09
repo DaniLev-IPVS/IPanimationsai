@@ -111,6 +111,34 @@ export async function inferenceUsage(key: AccessKey, start: string, end: string)
   }));
 }
 
+const WINDOW_DAYS = 30;
+const DAY_MS = 86400000;
+const ymd = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/**
+ * BytePlus rejects a usage query of 31 days or more, so longer spans go out in
+ * 30-day pieces. Rows that differ only by a dimension we don't keep (billing
+ * status, model unit) are added together: one row per day, key and model.
+ */
+export async function inferenceUsageSince(key: AccessKey, daysBack: number, now = Date.now()): Promise<UsageRow[]> {
+  const merged = new Map<string, UsageRow>();
+  for (let back = 0; back < daysBack; back += WINDOW_DAYS) {
+    const end = now - back * DAY_MS;
+    const start = end - (Math.min(WINDOW_DAYS, daysBack - back) - 1) * DAY_MS;
+    for (const row of await inferenceUsage(key, ymd(start), ymd(end))) {
+      const id = `${row.day}|${row.authToken}|${row.model}`;
+      const seen = merged.get(id);
+      if (seen) {
+        seen.totalTokens += row.totalTokens;
+        seen.requests += row.requests;
+      } else {
+        merged.set(id, { ...row });
+      }
+    }
+  }
+  return Array.from(merged.values());
+}
+
 /** Usage shows a key as "abc****de123"; the key list as "abcdefgh*****…*****xyzde123". */
 export function sameKey(authToken: string, maskedKey: string): boolean {
   const head = authToken.split("*")[0];

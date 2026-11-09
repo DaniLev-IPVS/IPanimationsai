@@ -1,5 +1,5 @@
 import { decryptSecret } from "./auth";
-import { inferenceUsage, listApiKeys, sameKey, type AccessKey } from "./byteplus";
+import { inferenceUsageSince, listApiKeys, sameKey, type AccessKey } from "./byteplus";
 import { one, q } from "./db";
 
 /**
@@ -18,8 +18,6 @@ export async function usageAccess(): Promise<AccessKey | null> {
   return { id, secret };
 }
 
-const ymd = (d: Date) => d.toISOString().slice(0, 10);
-
 export async function importKeyUsage(access?: AccessKey): Promise<{ keys: number; rows: number }> {
   const key = access || (await usageAccess());
   if (!key) return { keys: 0, rows: 0 };
@@ -34,9 +32,7 @@ export async function importKeyUsage(access?: AccessKey): Promise<{ keys: number
     );
   }
 
-  const end = new Date();
-  const start = new Date(end.getTime() - DAYS_BACK * 86400000);
-  const rows = await inferenceUsage(key, ymd(start), ymd(end));
+  const rows = await inferenceUsageSince(key, DAYS_BACK);
   const withKey = rows.map((r) => ({
     day: r.day,
     auth_token: r.authToken,
