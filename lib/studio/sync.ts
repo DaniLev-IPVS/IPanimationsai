@@ -5,6 +5,10 @@ import { q } from "./db";
  * BytePlus → Neon. Every Seedance render is a task on BytePlus, listed with its
  * model, resolution, tokens and time. BytePlus only keeps tasks for 7 days
  * (14 for drafts), so the hourly cron copies them here where they stay.
+ *
+ * That list covers the whole BytePlus account, whichever key asks, and says
+ * nothing about which key made a render. So a render is filed under the account
+ * owner until a person's own ComfyUI run proves it was theirs.
  */
 
 const ARK = process.env.BYTEPLUS_BASE_URL || "https://ark.ap-southeast.bytepluses.com/api/v3";
@@ -47,7 +51,7 @@ function priceOf(task: Task, rates: Rate[]): number | null {
   return rate ? (tokens / 1_000_000) * Number(rate.usd_per_million) : null;
 }
 
-async function syncKey(key: { id: string; user_id: string; secret_enc: string }, rates: Rate[]) {
+async function syncKey(key: { id: string; secret_enc: string }, owner: string, rates: Rate[]) {
   const apiKey = decryptSecret(key.secret_enc);
   let seen = 0;
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -82,7 +86,7 @@ async function syncKey(key: { id: string; user_id: string; secret_enc: string },
          updated_at = excluded.updated_at,
          cost_usd = case when studio.renders.status = 'succeeded' and studio.renders.cost_usd is not null
                          then studio.renders.cost_usd else excluded.cost_usd end`,
-      [JSON.stringify(rows), key.id, key.user_id],
+      [JSON.stringify(rows), key.id, owner],
     );
     seen += items.length;
     if (seen >= total || items.length < PAGE_SIZE) break;
@@ -106,20 +110,20 @@ export async function repriceUnpriced() {
 /**
  * Tie renders to ComfyUI runs: first by a task id seen in the run, otherwise
  * because the task was created while that run was executing. ComfyUI runs its
- * queue one prompt at a time, so a person's runs don't overlap. A run saved
- * under Project/Video/... then files its renders there. Anything set by hand
- * is left alone.
+ * queue one prompt at a time, so a person's runs don't overlap. A matched render
+ * becomes that person's, and a run saved under Project/Video/... files it there.
+ * Projects set by hand are left alone.
  */
 export async function matchComfy() {
   await q(
-    `update studio.renders r set comfy_prompt_id = c.prompt_id
+    `update studio.renders r set comfy_prompt_id = c.prompt_id, user_id = c.user_id
        from studio.comfy_runs c
       where r.comfy_prompt_id is null and r.id = any(c.task_ids)`,
   );
   await q(
-    `update studio.renders r set comfy_prompt_id = c.prompt_id
+    `update studio.renders r set comfy_prompt_id = c.prompt_id, user_id = c.user_id
        from studio.comfy_runs c
-      where r.comfy_prompt_id is null and r.user_id = c.user_id
+      where r.comfy_prompt_id is null
         and r.created_at between c.started_at - interval '5 seconds' and c.ended_at + interval '5 seconds'`,
   );
   const norm = (col: string) => `regexp_replace(lower(${col}), '[^a-z0-9]+', '', 'g')`;
@@ -147,15 +151,18 @@ export async function matchComfy() {
 }
 
 export async function syncAll(): Promise<{ keys: number; tasks: number; errors: string[] }> {
-  const keys = await q<{ id: string; user_id: string; label: string; secret_enc: string }>(
-    `select id, user_id, label, secret_enc from studio.api_keys where active`,
+  const keys = await q<{ id: string; label: string; secret_enc: string }>(
+    `select id, label, secret_enc from studio.api_keys where active`,
   );
   const rates = await q<Rate>(`select model, resolution, usd_per_million from studio.rates`);
+  const admin = await q<{ id: string }>(`select id from studio.users where role = 'admin' and active order by created_at limit 1`);
+  if (!admin.length) return { keys: keys.length, tasks: 0, errors: ["No active admin to file renders under."] };
+  const owner = admin[0].id;
   let tasks = 0;
   const errors: string[] = [];
   for (const key of keys) {
     try {
-      tasks += await syncKey(key, rates);
+      tasks += await syncKey(key, owner, rates);
       await q(`update studio.api_keys set last_sync_at = now(), last_sync_error = null where id = $1`, [key.id]);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
