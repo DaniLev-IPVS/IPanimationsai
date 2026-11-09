@@ -51,7 +51,7 @@ export async function setPassword(fd: FormData) {
   const token = text(fd, "token");
   const password = String(fd.get("password") ?? "");
   const again = `/studio/setup?t=${encodeURIComponent(token)}&e=`;
-  if (password.length < 10) redirect(`${again}${encodeURIComponent("Use at least 10 characters.")}`);
+  if (password.length < 6) redirect(`${again}${encodeURIComponent("Use at least 6 characters.")}`);
   if (password !== String(fd.get("confirm") ?? "")) redirect(`${again}${encodeURIComponent("The two passwords don't match.")}`);
 
   const row = await one<{ user_id: string }>(

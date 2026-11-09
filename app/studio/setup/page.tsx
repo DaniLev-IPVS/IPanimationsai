@@ -37,11 +37,11 @@ export default async function Setup({ searchParams }: { searchParams: { t?: stri
         <input type="email" name="username" value={row.email} autoComplete="username" readOnly hidden />
         <label>
           New password
-          <input name="password" type="password" autoComplete="new-password" minLength={10} required autoFocus />
+          <input name="password" type="password" autoComplete="new-password" minLength={6} required autoFocus />
         </label>
         <label>
           Type it again
-          <input name="confirm" type="password" autoComplete="new-password" minLength={10} required />
+          <input name="confirm" type="password" autoComplete="new-password" minLength={6} required />
         </label>
         <button className="st-btn st-btn-primary" type="submit">Save and sign in</button>
       </form>
