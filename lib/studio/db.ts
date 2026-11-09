@@ -5,7 +5,8 @@ let client: ReturnType<typeof neon> | null = null;
 
 function db() {
   if (!client) {
-    const url = process.env.DATABASE_API;
+    // Pasted connection strings often keep the quotes from a .env file.
+    const url = process.env.DATABASE_API?.trim().replace(/^['"]|['"]$/g, "");
     if (!url) throw new Error("DATABASE_API is not set");
     client = neon(url);
   }
