@@ -288,11 +288,10 @@ export async function createSetupLink(userId: string): Promise<string> {
 }
 
 export async function addApiKey(fd: FormData) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const label = text(fd, "label");
   const secret = text(fd, "secret");
-  const person = text(fd, "person");
-  if (!label || !secret || !isUuid(person)) fail("/studio/settings", "Enter a label, the key and who uses it.");
+  if (!label || !secret) fail("/studio/settings", "Enter a label and the key.");
   let problem = "";
   try {
     await fetchTaskPage(secret, 1, 1);
@@ -302,7 +301,7 @@ export async function addApiKey(fd: FormData) {
   if (problem) fail("/studio/settings", `That key didn't work. ${problem}`);
   await q(`insert into studio.api_keys (label, user_id, secret_enc, last4) values ($1, $2, $3, $4)`, [
     label,
-    person,
+    admin.id,
     encryptSecret(secret),
     secret.slice(-4),
   ]);

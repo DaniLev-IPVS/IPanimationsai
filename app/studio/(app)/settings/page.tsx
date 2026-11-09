@@ -24,12 +24,14 @@ function UsageByKey({
   error,
   keys,
   people,
+  defaultOwner,
 }: {
   connected: boolean;
   syncedAt: string;
   error: string | null;
   keys: KeyRow[];
   people: { id: string; name: string }[];
+  defaultOwner: string;
 }) {
   return (
     <section className="st-card st-panel">
@@ -38,7 +40,7 @@ function UsageByKey({
         {connected ? <span className="st-chip st-chip-active">Connected</span> : <span className="st-chip">Not connected</span>}
       </div>
       <p className="st-muted st-small">
-        BytePlus reports usage per API key. That decides who spent what: each person sees only the keys set to them below. Keys not set to anyone count as yours.
+        BytePlus reports usage per API key. That decides who spent what: each person sees only the keys set to them below. A new key counts as yours until you change it.
       </p>
       {connected ? (
         <>
@@ -62,8 +64,7 @@ function UsageByKey({
                       <td>
                         <form action={setKeyOwner}>
                           <input type="hidden" name="id" value={k.id} />
-                          <AutoSelect name="owner" defaultValue={k.owner_id || ""} label={`Who uses ${k.name}`}>
-                            <option value="">You (account owner)</option>
+                          <AutoSelect name="owner" defaultValue={k.owner_id || defaultOwner} label={`Who uses ${k.name}`}>
                             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                           </AutoSelect>
                         </form>
@@ -195,9 +196,8 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
     q<{ id: string; name: string; email: string; role: string; active: boolean; has_password: boolean; comfy_last_seen: string | null }>(
       `select id, name, email, role, active, password_hash is not null as has_password, comfy_last_seen from studio.users order by created_at`,
     ),
-    q<{ id: string; label: string; last4: string; active: boolean; last_sync_at: string | null; last_sync_error: string | null; person: string }>(
-      `select k.id, k.label, k.last4, k.active, k.last_sync_at, k.last_sync_error, u.name as person
-         from studio.api_keys k join studio.users u on u.id = k.user_id order by k.created_at`,
+    q<{ id: string; label: string; last4: string; active: boolean; last_sync_at: string | null; last_sync_error: string | null }>(
+      `select id, label, last4, active, last_sync_at, last_sync_error from studio.api_keys order by created_at`,
     ),
     q<{ model: string; resolution: string; usd_per_million: string }>(`select model, resolution, usd_per_million from studio.rates order by model, resolution`),
     q<{ model: string; resolution: string | null; n: number }>(
@@ -266,21 +266,23 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
         syncedAt={fmt(meta("usage_synced_at"), tz)}
         error={meta("usage_error")}
         keys={bpKeys}
-        people={users.filter((u) => u.active && u.role !== "admin").map((u) => ({ id: u.id, name: u.name }))}
+        people={users.filter((u) => u.active || bpKeys.some((k) => k.owner_id === u.id)).map((u) => ({ id: u.id, name: u.name }))}
+        defaultOwner={users.find((u) => u.active && u.role === "admin")?.id || user.id}
       />
 
       <section className="st-card st-panel">
         <h2>Render list access</h2>
-        <p className="st-muted st-small">One key is enough to read every render on the account. Who a render belongs to comes from ComfyUI runs, not from this key.</p>
+        <p className="st-muted st-small">
+          {keys.length ? "You don't need to add anything here. " : ""}One key is enough to read every render on the account, whoever made them. This list doesn&apos;t decide who spent what.
+        </p>
         {keys.length ? (
           <div className="st-table-wrap">
             <table className="st-table">
-              <thead><tr><th>Key</th><th>Used by</th><th>Last update</th><th /></tr></thead>
+              <thead><tr><th>Key</th><th>Last update</th><th /></tr></thead>
               <tbody>
                 {keys.map((k) => (
                   <tr key={k.id} className={k.active ? "" : "is-off"}>
                     <td>{k.label}<small className="st-muted">ends in {k.last4}</small></td>
-                    <td>{k.person}</td>
                     <td>
                       {fmt(k.last_sync_at, tz)}
                       {k.last_sync_error ? <small className="st-error-text">{k.last_sync_error}</small> : null}
@@ -298,18 +300,11 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
             </table>
           </div>
         ) : (
-          <p className="st-empty">No keys yet. Paste the key you gave your producer.</p>
+          <p className="st-empty">No key yet. Paste any active BytePlus API key from this account.</p>
         )}
         <form action={addApiKey} className="st-form-row st-form-top" autoComplete="off">
           <label>Label <input name="label" placeholder="Producer key" required /></label>
           <label>BytePlus API key <input name="secret" type="password" autoComplete="off" required /></label>
-          <label>
-            Used by
-            <select name="person" required defaultValue="">
-              <option value="" disabled>Choose</option>
-              {users.filter((u) => u.active).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-          </label>
           <SubmitButton className="st-btn st-btn-primary" pendingLabel="Checking…">Add key</SubmitButton>
         </form>
         <p className="st-muted st-small">Stored encrypted and never shown again. Stopping tracking doesn&apos;t disable the key on BytePlus.</p>
