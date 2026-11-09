@@ -283,6 +283,33 @@ a {
 .top__link:hover {
   color: var(--ink);
 }
+/* Quieter than the book button, which stays the one to press. */
+.top__login {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.top__login:hover {
+  background: var(--paper-2);
+}
+@media (max-width: 767px) {
+  .top__nav {
+    gap: 0.5rem;
+  }
+  .top__login,
+  .top__cta {
+    padding: 0 0.55rem;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 339px) {
+  .top__cta {
+    white-space: normal;
+  }
+}
 
 /* ── hero: the headline block (inside the stage flow) ─────────────────── */
 

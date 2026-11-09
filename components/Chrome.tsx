@@ -16,6 +16,9 @@ export function Header({ bookHref = "#quote", bookLabel = brand.book }: { bookHr
         <a href="#work" className="top__link">
           Our work
         </a>
+        <a href="/studio/login" className="btn btn--sm top__login" rel="nofollow">
+          Log in
+        </a>
         <a href={bookHref} className="btn btn--sm top__cta">
           {bookLabel}
         </a>
