@@ -3,7 +3,6 @@ import { getTimezone, one, q } from "@/lib/studio/db";
 import {
   addApiKey,
   addUser,
-  createComfyToken,
   createSetupLink,
   deleteRate,
   saveRate,
@@ -16,29 +15,33 @@ import { RevealAction, SubmitButton } from "../../ui";
 const fmt = (v: string | null, tz: string) =>
   v ? new Date(v).toLocaleString("en-US", { timeZone: tz, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Never";
 
-function Comfy({ connected, lastSeen }: { connected: boolean; lastSeen: string }) {
+// The tracker says hello every 5 minutes while ComfyUI is open.
+const isOnline = (lastSeen: string | null | undefined) => Boolean(lastSeen) && Date.now() - Date.parse(String(lastSeen)) < 12 * 60000;
+
+function Comfy({ online, lastSeen }: { online: boolean; lastSeen: string }) {
   return (
     <section className="st-card st-panel">
-      <h2>ComfyUI</h2>
+      <div className="st-panel-head">
+        <h2>ComfyUI</h2>
+        {online ? <span className="st-chip st-chip-active">Connected</span> : <span className="st-chip">Not connected</span>}
+      </div>
       <p>This tells the dashboard which project each render belongs to. Without it, renders still appear and can be assigned by hand.</p>
       <ol className="st-steps">
         <li>
-          Get your token.{" "}
-          <RevealAction
-            action={createComfyToken}
-            label={connected ? "Make a new token" : "Make my token"}
-            note="Shown once. A new token replaces the old one."
-          />
+          <form method="post" action="/api/studio/comfy/tracker">
+            <button className="st-btn st-btn-primary" type="submit">Download my tracker</button>
+          </form>
         </li>
+        <li>Open ComfyUI&apos;s <b>custom_nodes</b> folder. In the ComfyUI desktop app, the Help menu opens its folders. Otherwise it&apos;s inside your ComfyUI folder.</li>
+        <li>Drag the downloaded file, <b>ipa_studio_tracker.py</b>, into that folder.</li>
+        <li>Close ComfyUI and open it again. After a few seconds, refresh this page. It should say Connected.</li>
         <li>
-          Download <a href="/studio/comfy-tracker.py" download>comfy-tracker.py</a> and leave it running beside ComfyUI:
-          <pre><code>python3 comfy-tracker.py --token YOUR_TOKEN</code></pre>
-        </li>
-        <li>
-          In your save node, set <code>filename_prefix</code> to <code>Project Name/Video Name/shot</code>. The project name must match one in Projects.
+          When you save a video in ComfyUI, type <code>Project Name/Video Name/shot</code> in the save node&apos;s <b>filename_prefix</b> box. The project name must match one in Projects.
         </li>
       </ol>
-      <p className="st-muted st-small">Tracker last checked in: {lastSeen}</p>
+      <p className="st-muted st-small">
+        Last connected: {lastSeen}. The file is personal, so please don&apos;t share it. Downloading it again makes the old one stop working, so replace it in the folder.
+      </p>
     </section>
   );
 }
@@ -46,11 +49,8 @@ function Comfy({ connected, lastSeen }: { connected: boolean; lastSeen: string }
 export default async function Settings({ searchParams }: { searchParams: { e?: string } }) {
   const user = await requireUser();
   const tz = await getTimezone();
-  const me = await one<{ comfy_token_hash: string | null; comfy_last_seen: string | null }>(
-    `select comfy_token_hash, comfy_last_seen from studio.users where id = $1`,
-    [user.id],
-  );
-  const comfy = <Comfy connected={Boolean(me?.comfy_token_hash)} lastSeen={fmt(me?.comfy_last_seen ?? null, tz)} />;
+  const me = await one<{ comfy_last_seen: string | null }>(`select comfy_last_seen from studio.users where id = $1`, [user.id]);
+  const comfy = <Comfy online={isOnline(me?.comfy_last_seen)} lastSeen={fmt(me?.comfy_last_seen ?? null, tz)} />;
 
   if (user.role !== "admin") {
     return (
@@ -90,7 +90,12 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
                 <tr key={u.id} className={u.active ? "" : "is-off"}>
                   <td>{u.name}<small className="st-muted">{u.email}</small></td>
                   <td>{u.role === "admin" ? "Admin" : "Producer"}</td>
-                  <td>{!u.active ? "Turned off" : u.has_password ? "Active" : "Waiting for password"}</td>
+                  <td>
+                    {!u.active ? "Turned off" : u.has_password ? "Active" : "Waiting for password"}
+                    <small className="st-muted">
+                      ComfyUI: {isOnline(u.comfy_last_seen) ? "connected" : u.comfy_last_seen ? `last seen ${fmt(u.comfy_last_seen, tz)}` : "not set up"}
+                    </small>
+                  </td>
                   <td>
                     <RevealAction
                       action={createSetupLink.bind(null, u.id)}

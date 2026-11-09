@@ -7,7 +7,6 @@ import {
   encryptSecret,
   endSession,
   hashPassword,
-  newToken,
   requireAdmin,
   requireUser,
   sha256,
@@ -289,13 +288,4 @@ export async function saveTimezone(fd: FormData) {
     [tz],
   );
   done();
-}
-
-/** A fresh token for the ComfyUI tracker. Replaces any earlier one. */
-export async function createComfyToken(): Promise<string> {
-  const user = await requireUser();
-  const token = `ipc_${newToken(24)}`;
-  await q(`update studio.users set comfy_token_hash = $2 where id = $1`, [user.id, sha256(token)]);
-  done();
-  return token;
 }

@@ -4,8 +4,9 @@ import { one, q } from "@/lib/studio/db";
 import { matchComfy } from "@/lib/studio/sync";
 
 /**
- * Where public/studio/comfy-tracker.py reports finished ComfyUI runs. The
- * person's own token (Settings → ComfyUI) says whose runs these are.
+ * Where the ComfyUI tracker (lib/studio/comfy-node.ts) reports finished runs,
+ * plus a heartbeat with no runs. The token inside each person's downloaded
+ * file says whose runs these are.
  */
 
 export const runtime = "nodejs";
