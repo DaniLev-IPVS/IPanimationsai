@@ -1,6 +1,7 @@
 "use client";
 
 import Script from "next/script";
+import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { on } from "@/lib/bus";
 import { captureAttribution, newEventId } from "@/lib/attribution";
@@ -21,6 +22,12 @@ declare global {
  * with the same eventID, so Meta counts it once.
  */
 export function MetaPixel({ id }: { id: string }) {
+  // The studio tracker is internal: no ad tracking on its pages.
+  if (usePathname()?.startsWith("/studio")) return null;
+  return <Pixel id={id} />;
+}
+
+function Pixel({ id }: { id: string }) {
   // Keep the ad's URL parameters for the session on whatever page the click
   // lands on (usually the homepage), so the form on /book still has them.
   useEffect(() => {

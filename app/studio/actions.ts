@@ -1,0 +1,301 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import {
+  createSetupToken,
+  encryptSecret,
+  endSession,
+  hashPassword,
+  newToken,
+  requireAdmin,
+  requireUser,
+  sha256,
+  startSession,
+  verifyPassword,
+} from "@/lib/studio/auth";
+import { getTimezone, isUuid, one, q } from "@/lib/studio/db";
+import { parseFilters, whereOf } from "@/lib/studio/filters";
+import { fetchTaskPage, matchComfy, repriceUnpriced, syncAll } from "@/lib/studio/sync";
+
+const text = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
+const fail = (path: string, message: string): never => redirect(`${path}?e=${encodeURIComponent(message)}`);
+const done = () => revalidatePath("/studio", "layout");
+
+// ── Signing in ─────────────────────────────────────────────────────────────
+
+export async function login(fd: FormData) {
+  const email = text(fd, "email").toLowerCase();
+  const password = String(fd.get("password") ?? "");
+  const lock = await one<{ n: number }>(
+    `select count(*)::int as n from studio.login_failures where email = $1 and at > now() - interval '15 minutes'`,
+    [email],
+  );
+  if ((lock?.n ?? 0) >= 8) fail("/studio/login", "Too many tries. Wait 15 minutes.");
+
+  const user = await one<{ id: string; password_hash: string | null; active: boolean }>(
+    `select id, password_hash, active from studio.users where email = $1`,
+    [email],
+  );
+  const ok = await verifyPassword(password, user?.password_hash ?? null);
+  if (!user || !ok || !user.active) {
+    await q(`insert into studio.login_failures (email) values ($1)`, [email]);
+    fail("/studio/login", "That email and password don't match.");
+  }
+  await q(`delete from studio.login_failures where email = $1`, [email]);
+  await startSession(user!.id);
+  redirect("/studio");
+}
+
+export async function setPassword(fd: FormData) {
+  const token = text(fd, "token");
+  const password = String(fd.get("password") ?? "");
+  const again = `/studio/setup?t=${encodeURIComponent(token)}&e=`;
+  if (password.length < 10) redirect(`${again}${encodeURIComponent("Use at least 10 characters.")}`);
+  if (password !== String(fd.get("confirm") ?? "")) redirect(`${again}${encodeURIComponent("The two passwords don't match.")}`);
+
+  const row = await one<{ user_id: string }>(
+    `update studio.setup_tokens set used_at = now()
+      where token_hash = $1 and used_at is null and expires_at > now()
+      returning user_id`,
+    [sha256(token)],
+  );
+  if (!row) fail("/studio/login", "That link has expired or was already used. Ask for a new one.");
+  await q(`update studio.users set password_hash = $2 where id = $1`, [row!.user_id, await hashPassword(password)]);
+  await q(`delete from studio.sessions where user_id = $1`, [row!.user_id]);
+  await startSession(row!.user_id);
+  redirect("/studio");
+}
+
+export async function logout() {
+  await endSession();
+  redirect("/studio/login");
+}
+
+// ── Renders ────────────────────────────────────────────────────────────────
+
+export async function syncNow() {
+  await requireUser();
+  await syncAll();
+  done();
+}
+
+/** "projectId|videoId" from the assign menu, checked against the database. */
+async function resolveTarget(value: string) {
+  if (!value) return { project: null as string | null, video: null as string | null };
+  const [project, video] = value.split("|");
+  if (!isUuid(project)) return null;
+  if (video) {
+    if (!isUuid(video)) return null;
+    const row = await one(`select 1 from studio.videos where id = $1 and project_id = $2`, [video, project]);
+    return row ? { project, video } : null;
+  }
+  const row = await one(`select 1 from studio.projects where id = $1`, [project]);
+  return row ? { project, video: null as string | null } : null;
+}
+
+export async function assignRender(fd: FormData) {
+  const user = await requireUser();
+  const target = await resolveTarget(text(fd, "target"));
+  if (!target) return;
+  await q(
+    `update studio.renders set project_id = $2, video_id = $3, assigned_via = 'manual'
+      where id = $1 and ($4::uuid is null or user_id = $4::uuid)`,
+    [text(fd, "id"), target.project, target.video, user.role === "admin" ? null : user.id],
+  );
+  done();
+}
+
+export async function setRenderPerson(fd: FormData) {
+  await requireAdmin();
+  const person = text(fd, "person");
+  if (!isUuid(person)) return;
+  await q(`update studio.renders set user_id = $2 where id = $1`, [text(fd, "id"), person]);
+  done();
+}
+
+/** Assign every unassigned render matching the current filters. */
+export async function bulkAssign(fd: FormData) {
+  const user = await requireUser();
+  const target = await resolveTarget(text(fd, "target"));
+  if (!target || !target.project) return;
+  const sp: Record<string, string> = {};
+  new URLSearchParams(text(fd, "qs")).forEach((v, k) => (sp[k] = v));
+  const filters = parseFilters(sp, await getTimezone(), user);
+  const { where, params } = whereOf({ ...filters, unassigned: false }, user);
+  await q(
+    `update studio.renders r
+        set project_id = $${params.length + 1}::uuid, video_id = $${params.length + 2}::uuid, assigned_via = 'manual'
+      where ${where} and r.project_id is null and r.status = 'succeeded'`,
+    [...params, target.project, target.video],
+  );
+  done();
+}
+
+// ── Projects and videos ────────────────────────────────────────────────────
+
+export async function createProject(fd: FormData) {
+  await requireUser();
+  const name = text(fd, "name");
+  if (!name) fail("/studio/projects", "Give the project a name.");
+  const client = text(fd, "client") || null;
+  const budget = text(fd, "budget");
+  const row = await one(
+    `insert into studio.projects (name, client, budget_usd) values ($1, $2, $3)
+     on conflict (lower(name)) do nothing returning id`,
+    [name, client, budget ? Number(budget) : null],
+  );
+  if (!row) fail("/studio/projects", "There is already a project with that name.");
+  await matchComfy();
+  done();
+}
+
+export async function updateProject(fd: FormData) {
+  await requireAdmin();
+  const id = text(fd, "id");
+  if (!isUuid(id)) return;
+  const status = text(fd, "status");
+  if (["active", "done", "archived"].indexOf(status) < 0) return;
+  const budget = text(fd, "budget");
+  await q(`update studio.projects set name = $2, client = $3, status = $4, budget_usd = $5 where id = $1`, [
+    id,
+    text(fd, "name"),
+    text(fd, "client") || null,
+    status,
+    budget ? Number(budget) : null,
+  ]);
+  done();
+}
+
+export async function createVideo(fd: FormData) {
+  await requireUser();
+  const project = text(fd, "project");
+  const name = text(fd, "name");
+  if (!isUuid(project) || !name) return;
+  await q(`insert into studio.videos (project_id, name) values ($1, $2) on conflict do nothing`, [project, name]);
+  await matchComfy();
+  done();
+}
+
+export async function setVideoStatus(fd: FormData) {
+  await requireUser();
+  const id = text(fd, "id");
+  const status = text(fd, "status");
+  if (!isUuid(id) || ["in_production", "delivered"].indexOf(status) < 0) return;
+  await q(`update studio.videos set status = $2 where id = $1`, [id, status]);
+  done();
+}
+
+// ── Settings (admin) ───────────────────────────────────────────────────────
+
+export async function addUser(fd: FormData) {
+  await requireAdmin();
+  const email = text(fd, "email").toLowerCase();
+  const name = text(fd, "name");
+  const role = text(fd, "role");
+  if (!/^\S+@\S+\.\S+$/.test(email) || !name || ["admin", "producer"].indexOf(role) < 0) {
+    fail("/studio/settings", "Enter a name, a valid email and a role.");
+  }
+  const row = await one(
+    `insert into studio.users (email, name, role) values ($1, $2, $3) on conflict (email) do nothing returning id`,
+    [email, name, role],
+  );
+  if (!row) fail("/studio/settings", "That email already has an account.");
+  done();
+}
+
+export async function setUserActive(fd: FormData) {
+  const me = await requireAdmin();
+  const id = text(fd, "id");
+  if (!isUuid(id) || id === me.id) return;
+  const active = text(fd, "active") === "true";
+  await q(`update studio.users set active = $2 where id = $1`, [id, active]);
+  if (!active) await q(`delete from studio.sessions where user_id = $1`, [id]);
+  done();
+}
+
+/** Returns the link to hand over. Also how a forgotten password gets reset. */
+export async function createSetupLink(userId: string): Promise<string> {
+  await requireAdmin();
+  if (!isUuid(userId)) return "";
+  const token = await createSetupToken(userId);
+  const base = process.env.NODE_ENV === "production" ? "https://ipanimations.ai" : "http://localhost:3100";
+  return `${base}/studio/setup?t=${token}`;
+}
+
+export async function addApiKey(fd: FormData) {
+  await requireAdmin();
+  const label = text(fd, "label");
+  const secret = text(fd, "secret");
+  const person = text(fd, "person");
+  if (!label || !secret || !isUuid(person)) fail("/studio/settings", "Enter a label, the key and who uses it.");
+  let problem = "";
+  try {
+    await fetchTaskPage(secret, 1, 1);
+  } catch (e) {
+    problem = e instanceof Error ? e.message : "BytePlus rejected the key.";
+  }
+  if (problem) fail("/studio/settings", `That key didn't work. ${problem}`);
+  await q(`insert into studio.api_keys (label, user_id, secret_enc, last4) values ($1, $2, $3, $4)`, [
+    label,
+    person,
+    encryptSecret(secret),
+    secret.slice(-4),
+  ]);
+  await syncAll();
+  done();
+}
+
+export async function setApiKeyActive(fd: FormData) {
+  await requireAdmin();
+  const id = text(fd, "id");
+  if (!isUuid(id)) return;
+  await q(`update studio.api_keys set active = $2 where id = $1`, [id, text(fd, "active") === "true"]);
+  done();
+}
+
+export async function saveRate(fd: FormData) {
+  await requireAdmin();
+  const model = text(fd, "model");
+  const resolution = text(fd, "resolution").toLowerCase() || "*";
+  const value = Number(text(fd, "rate"));
+  if (!model || !(value >= 0)) fail("/studio/settings", "Enter a model and a price.");
+  await q(
+    `insert into studio.rates (model, resolution, usd_per_million) values ($1, $2, $3)
+     on conflict (model, resolution) do update set usd_per_million = excluded.usd_per_million`,
+    [model, resolution, value],
+  );
+  await repriceUnpriced();
+  done();
+}
+
+export async function deleteRate(fd: FormData) {
+  await requireAdmin();
+  await q(`delete from studio.rates where model = $1 and resolution = $2`, [text(fd, "model"), text(fd, "resolution")]);
+  done();
+}
+
+export async function saveTimezone(fd: FormData) {
+  await requireAdmin();
+  const tz = text(fd, "timezone");
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone: tz });
+  } catch {
+    fail("/studio/settings", "That isn't a time zone name. Try America/Toronto.");
+  }
+  await q(
+    `insert into studio.settings (key, value) values ('timezone', $1)
+     on conflict (key) do update set value = excluded.value`,
+    [tz],
+  );
+  done();
+}
+
+/** A fresh token for the ComfyUI tracker. Replaces any earlier one. */
+export async function createComfyToken(): Promise<string> {
+  const user = await requireUser();
+  const token = `ipc_${newToken(24)}`;
+  await q(`update studio.users set comfy_token_hash = $2 where id = $1`, [user.id, sha256(token)]);
+  done();
+  return token;
+}
