@@ -18,29 +18,52 @@ const fmt = (v: string | null, tz: string) =>
 // The tracker says hello every 5 minutes while ComfyUI is open.
 const isOnline = (lastSeen: string | null | undefined) => Boolean(lastSeen) && Date.now() - Date.parse(String(lastSeen)) < 12 * 60000;
 
-function Comfy({ online, lastSeen }: { online: boolean; lastSeen: string }) {
+function Comfy({ online, lastSeen, names }: { online: boolean; lastSeen: string; names: { label: string; project: string }[] }) {
   return (
     <section className="st-card st-panel">
       <div className="st-panel-head">
-        <h2>ComfyUI</h2>
+        <h2>Connect ComfyUI</h2>
         {online ? <span className="st-chip st-chip-active">Connected</span> : <span className="st-chip">Not connected</span>}
       </div>
-      <p>This tells the dashboard which project each render belongs to. Without it, renders still appear and can be assigned by hand.</p>
+      <p>You only do this once, and it takes about two minutes. There&apos;s no code and nothing to install.</p>
       <ol className="st-steps">
         <li>
-          <form method="post" action="/api/studio/comfy/tracker">
+          Click this button. Your browser saves a file called <b>ipa_studio_tracker.py</b>.
+          <form method="post" action="/api/studio/comfy/tracker" className="st-step-action">
             <button className="st-btn st-btn-primary" type="submit">Download my tracker</button>
           </form>
         </li>
-        <li>Open ComfyUI&apos;s <b>custom_nodes</b> folder. In the ComfyUI desktop app, the Help menu opens its folders. Otherwise it&apos;s inside your ComfyUI folder.</li>
-        <li>Drag the downloaded file, <b>ipa_studio_tracker.py</b>, into that folder.</li>
-        <li>Close ComfyUI and open it again. After a few seconds, refresh this page. It should say Connected.</li>
         <li>
-          When you save a video in ComfyUI, type <code>Project Name/Video Name/shot</code> in the save node&apos;s <b>filename_prefix</b> box. The project name must match one in Projects.
+          Find ComfyUI&apos;s <b>custom_nodes</b> folder.
+          <ul className="st-sublist">
+            <li>ComfyUI desktop app: open the <b>Help</b> menu and choose to open the custom nodes folder.</li>
+            <li>Any other install: open your <b>ComfyUI</b> folder. <b>custom_nodes</b> is inside it.</li>
+          </ul>
         </li>
+        <li>Drag <b>ipa_studio_tracker.py</b> from your Downloads into that folder. Put it directly in the folder, not inside another folder.</li>
+        <li>Quit ComfyUI completely and open it again.</li>
+        <li>Wait a few seconds, then refresh this page. The label at the top should say <b>Connected</b>.</li>
       </ol>
+
+      <h3 className="st-subhead">Naming your videos</h3>
+      <p>
+        Name videos the way you normally do, and include the project&apos;s name anywhere in it. For example, <code>Wooshi_ep3_shot</code> goes to the Wooshi project. Type it once in the save node&apos;s <b>filename_prefix</b> box. ComfyUI remembers it with that workflow, so you won&apos;t need to type it again.
+      </p>
+      {names.length ? (
+        <p className="st-small">
+          <b>Names the dashboard recognizes:</b>{" "}
+          {names.map((n, i) => (
+            <span key={n.label}>
+              {i ? ", " : ""}<code>{n.label}</code>{n.label.toLowerCase() === n.project.toLowerCase() ? "" : ` (${n.project})`}
+            </span>
+          ))}
+        </p>
+      ) : null}
       <p className="st-muted st-small">
-        Last connected: {lastSeen}. The file is personal, so please don&apos;t share it. Downloading it again makes the old one stop working, so replace it in the folder.
+        If a name isn&apos;t recognized, nothing is lost. The render waits under Unassigned until it&apos;s filed.
+      </p>
+      <p className="st-muted st-small">
+        Last connected: {lastSeen}. This file is personal, so please don&apos;t share it. If you download it again, the old one stops working, so replace it in the folder.
       </p>
     </section>
   );
@@ -50,7 +73,13 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
   const user = await requireUser();
   const tz = await getTimezone();
   const me = await one<{ comfy_last_seen: string | null }>(`select comfy_last_seen from studio.users where id = $1`, [user.id]);
-  const comfy = <Comfy online={isOnline(me?.comfy_last_seen)} lastSeen={fmt(me?.comfy_last_seen ?? null, tz)} />;
+  const names = await q<{ label: string; project: string }>(
+    `select n.match_text as label, p.name as project from studio.name_rules n join studio.projects p on p.id = n.project_id
+     union
+     select name, name from studio.projects where status = 'active'
+     order by 1`,
+  );
+  const comfy = <Comfy online={isOnline(me?.comfy_last_seen)} lastSeen={fmt(me?.comfy_last_seen ?? null, tz)} names={names} />;
 
   if (user.role !== "admin") {
     return (

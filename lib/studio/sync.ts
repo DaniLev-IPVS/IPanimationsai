@@ -137,15 +137,37 @@ export async function matchComfy() {
         and not exists (select 1 from studio.videos v where v.project_id = p.id and ${norm("v.name")} = ${norm("c.video_hint")})
      on conflict do nothing`,
   );
+  // What the producer called it. Case, spaces and punctuation don't matter.
+  const hay = norm(`coalesce(c.filename_prefix, '') || ' ' || coalesce(c.workflow, '') || ' ' || coalesce(c.outputs::text, '')`);
+  // A naming rule beats a project's own name; the longest match wins in each.
   await q(
     `update studio.renders r
         set comfy_hint = c.filename_prefix,
-            project_id = case when r.project_id is null then p.id else r.project_id end,
-            video_id = case when r.project_id is null then v.id else r.video_id end,
-            assigned_via = case when r.project_id is null and p.id is not null then 'comfy' else r.assigned_via end
+            project_id = case when r.project_id is null then t.project_id else r.project_id end,
+            video_id = case when r.project_id is null then t.video_id else r.video_id end,
+            assigned_via = case when r.project_id is null and t.project_id is not null then 'comfy' else r.assigned_via end
        from studio.comfy_runs c
-       left join studio.projects p on ${norm("p.name")} = ${norm("c.project_hint")}
-       left join studio.videos v on v.project_id = p.id and ${norm("v.name")} = ${norm("c.video_hint")}
+       left join lateral (
+         select m.project_id,
+                coalesce(m.video_id, (
+                  select v.id from studio.videos v
+                   where v.project_id = m.project_id
+                     and length(${norm("v.name")}) >= 2
+                     and position(${norm("v.name")} in ${hay}) > 0
+                   order by length(${norm("v.name")}) desc limit 1
+                )) as video_id
+           from (
+             select n.project_id, n.video_id, 2 as tier, length(${norm("n.match_text")}) as len
+               from studio.name_rules n
+              where position(${norm("n.match_text")} in ${hay}) > 0
+             union all
+             select p.id, null::uuid, 1, length(${norm("p.name")})
+               from studio.projects p
+              where p.status = 'active' and length(${norm("p.name")}) >= 3
+                and position(${norm("p.name")} in ${hay}) > 0
+           ) m
+          order by m.tier desc, m.len desc limit 1
+       ) t on true
       where r.comfy_prompt_id = c.prompt_id`,
   );
 }

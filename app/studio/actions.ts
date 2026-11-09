@@ -185,6 +185,31 @@ export async function setVideoStatus(fd: FormData) {
   done();
 }
 
+// ── Naming rules (admin): "if the file name contains X, it's this project" ─
+
+export async function addNameRule(fd: FormData) {
+  await requireAdmin();
+  const matchText = text(fd, "text");
+  const target = await resolveTarget(text(fd, "target"));
+  if (matchText.replace(/[^a-z0-9]/gi, "").length < 2) fail("/studio/projects", "Enter at least two letters or numbers to look for.");
+  if (!target || !target.project) fail("/studio/projects", "Choose a project for that name.");
+  await q(
+    `insert into studio.name_rules (match_text, project_id, video_id) values ($1, $2, $3)
+     on conflict (lower(match_text)) do update set project_id = excluded.project_id, video_id = excluded.video_id`,
+    [matchText, target!.project, target!.video],
+  );
+  await matchComfy();
+  done();
+}
+
+export async function deleteNameRule(fd: FormData) {
+  await requireAdmin();
+  const id = text(fd, "id");
+  if (!isUuid(id)) return;
+  await q(`delete from studio.name_rules where id = $1`, [id]);
+  done();
+}
+
 // ── Settings (admin) ───────────────────────────────────────────────────────
 
 export async function addUser(fd: FormData) {

@@ -46,7 +46,7 @@ export function parseFilters(sp: Params, tz: string, user: StudioUser): Filters 
   else if (range === "lastmonth") {
     const lastDay = addDays(`${now.slice(0, 7)}-01`, -1);
     [from, to] = [`${lastDay.slice(0, 7)}-01`, lastDay];
-  } else if (range === "all") [from, to] = ["2024-01-01", now];
+  } else if (range === "all") [from, to] = ["2020-01-01", now];
   else {
     if (!isDate(from)) from = addDays(now, -29);
     if (!isDate(to)) to = now;

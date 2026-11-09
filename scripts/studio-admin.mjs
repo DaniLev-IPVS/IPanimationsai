@@ -66,6 +66,14 @@ const SCHEMA = [
     created_at timestamptz not null default now()
   )`,
   `create unique index if not exists videos_name on studio.videos (project_id, lower(name))`,
+  `create table if not exists studio.name_rules (
+    id uuid primary key default gen_random_uuid(),
+    match_text text not null,
+    project_id uuid not null references studio.projects(id) on delete cascade,
+    video_id uuid references studio.videos(id) on delete set null,
+    created_at timestamptz not null default now()
+  )`,
+  `create unique index if not exists name_rules_text on studio.name_rules (lower(match_text))`,
   `create table if not exists studio.api_keys (
     id uuid primary key default gen_random_uuid(),
     label text not null,
