@@ -1,5 +1,6 @@
 import { decryptSecret } from "./auth";
 import { q } from "./db";
+import { importKeyUsage } from "./usage";
 
 /**
  * BytePlus → Neon. Every Seedance render is a task on BytePlus, listed with its
@@ -193,5 +194,17 @@ export async function syncAll(): Promise<{ keys: number; tasks: number; errors: 
     }
   }
   await matchComfy();
+  try {
+    await importKeyUsage();
+    await q(`delete from studio.settings where key = 'usage_error'`);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    errors.push(`Usage by key: ${message}`);
+    await q(
+      `insert into studio.settings (key, value) values ('usage_error', $1)
+       on conflict (key) do update set value = excluded.value`,
+      [message.slice(0, 500)],
+    );
+  }
   return { keys: keys.length, tasks, errors };
 }

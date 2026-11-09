@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/studio/auth";
-import { getTimezone, q } from "@/lib/studio/db";
+import { getTimezone, one, q } from "@/lib/studio/db";
 import { addDays, num, parseFilters, toQuery, usd, whereOf, type Filters, type Group, type Range } from "@/lib/studio/filters";
 import { assignRender, bulkAssign, setRenderPerson, syncNow } from "../actions";
 import { AutoSelect, SubmitButton } from "../ui";
@@ -27,6 +27,8 @@ const GROUP_SQL: Record<Group, { key: string; label: string; join: string }> = {
   },
   model: { key: "r.model", label: "r.model", join: "" },
   person: { key: "u.id::text", label: "u.name", join: "join studio.users u on u.id = r.user_id" },
+  // Answered from BytePlus usage instead of renders (see keyBreakdown).
+  key: { key: "r.model", label: "r.model", join: "" },
 };
 
 const dayLabel = (d: string, withYear = false) =>
@@ -104,8 +106,24 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
   const { where, params } = whereOf(f, user);
   const g = GROUP_SQL[f.group];
 
+  // BytePlus usage per API key is the truth for "who spent what". It can't be
+  // split by project, so a project filter falls back to renders.
+  const usageOn = Boolean(await one(`select 1 from studio.settings where key = 'byteplus_access'`));
+  const keyMode = usageOn && !f.project && !f.unassigned;
+  const keyOwner = isAdmin ? f.person : user.id;
+  const kParams: unknown[] = [f.from, f.to];
+  let kWhere = `k.day between $1::date and $2::date`;
+  if (keyOwner) {
+    const admin = await one<{ id: string }>(`select id from studio.users where role = 'admin' and active order by created_at limit 1`);
+    kParams.push(admin?.id ?? null, keyOwner);
+    kWhere += ` and coalesce(b.owner_id, $3::uuid) = $4::uuid`;
+  }
+  const kFrom = `studio.key_usage k left join studio.bp_keys b on b.id = k.bp_key_id`;
+
   const firstRender = f.range === "all"
-    ? (await q<{ d: string | null }>(`select to_char(min(r.created_at) at time zone $2::text, 'YYYY-MM-DD') as d from studio.renders r where ${where}`, params))[0]?.d
+    ? keyMode
+      ? (await q<{ d: string | null }>(`select to_char(min(k.day), 'YYYY-MM-DD') as d from ${kFrom} where ${kWhere}`, kParams))[0]?.d
+      : (await q<{ d: string | null }>(`select to_char(min(r.created_at) at time zone $2::text, 'YYYY-MM-DD') as d from studio.renders r where ${where}`, params))[0]?.d
     : null;
   const chartFrom = firstRender || f.from;
   const chartDays = Math.round((Date.parse(f.to) - Date.parse(chartFrom)) / 86400000) + 1;
@@ -155,8 +173,33 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
     q<{ last_sync_at: string | null; n: number }>(`select max(last_sync_at) as last_sync_at, count(*)::int as n from studio.api_keys where active`),
   ]);
 
+  const [keyTotals, keySeries, keyBreakdown] = usageOn
+    ? await Promise.all([
+        q<{ spend: string; unpriced: number; requests: number }>(
+          `select coalesce(sum(k.cost_usd), 0) as spend, count(*) filter (where k.cost_usd is null and k.total_tokens > 0)::int as unpriced,
+                  coalesce(sum(k.requests), 0)::int as requests
+             from ${kFrom} where ${kWhere}`,
+          kParams,
+        ),
+        q<{ bucket: string; spend: string; n: number }>(
+          `select to_char(k.day, '${monthly ? "YYYY-MM" : "YYYY-MM-DD"}') as bucket, coalesce(sum(k.cost_usd), 0) as spend, coalesce(sum(k.requests), 0)::int as n
+             from ${kFrom} where ${kWhere} group by 1 order by 1`,
+          kParams,
+        ),
+        q<{ key: string | null; label: string; spend: string; n: number; tokens: string; project_id: string | null }>(
+          `select coalesce(b.id::text, k.auth_token) as key, coalesce(b.name, 'Unknown key ' || k.auth_token) as label,
+                  coalesce(sum(k.cost_usd), 0) as spend, coalesce(sum(k.requests), 0)::int as n, coalesce(sum(k.total_tokens), 0) as tokens,
+                  null as project_id
+             from ${kFrom} where ${kWhere} group by 1, 2 order by 3 desc`,
+          kParams,
+        ),
+      ])
+    : [[], [], []];
+
   const t = totals[0];
-  const spend = Number(t.spend);
+  const spend = keyMode ? Number(keyTotals[0]?.spend || 0) : Number(t.spend);
+  const unpriced = keyMode ? keyTotals[0]?.unpriced || 0 : t.unpriced;
+  const shownBreakdown = f.group === "key" ? keyBreakdown : breakdown;
   const options: Option[] = projectRows.map((p) => ({
     ...p,
     videos: videoRows.filter((v) => v.project_id === p.id),
@@ -165,7 +208,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
 
   // Every day (or month) on the axis, including empty ones.
   const bySeries: Record<string, { spend: number; n: number }> = {};
-  series.forEach((s) => (bySeries[s.bucket] = { spend: Number(s.spend), n: s.n }));
+  (keyMode ? keySeries : series).forEach((s) => (bySeries[s.bucket] = { spend: Number(s.spend), n: s.n }));
   const points: { key: string; label: string; spend: number; n: number; day?: string }[] = [];
   if (monthly) {
     let cursor = `${chartFrom.slice(0, 7)}-01`;
@@ -199,7 +242,10 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
     ["video", "Video"],
     ["model", "Model"],
     ...(isAdmin ? ([["person", "Person"]] as [Group, string][]) : []),
+    ...(usageOn ? ([["key", "API key"]] as [Group, string][]) : []),
   ];
+  const personName = isAdmin && f.person ? people.find((p) => p.id === f.person)?.name : null;
+  const measuredFor = !keyOwner ? "all API keys" : isAdmin ? `${personName || "this person"}'s API keys` : "your API key";
 
   return (
     <>
@@ -248,9 +294,17 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
       </div>
 
       <section className="st-stats" aria-label="Totals">
-        <div className="st-card st-stat st-stat-hero"><span>Spent</span><b>{usd(spend)}</b></div>
+        <div className="st-card st-stat st-stat-hero">
+          <span>Spent</span>
+          <b>{usd(spend)}</b>
+          <small className="st-muted">{keyMode ? `Measured by BytePlus on ${measuredFor}` : f.project ? "Renders filed under this project" : "From renders"}</small>
+        </div>
         <div className="st-card st-stat"><span>Finished renders</span><b>{num(t.done)}</b></div>
-        <div className="st-card st-stat"><span>Average per render</span><b>{usd(t.done ? spend / t.done : 0)}</b></div>
+        {keyMode ? (
+          <div className="st-card st-stat"><span>Requests to BytePlus</span><b>{num(keyTotals[0]?.requests || 0)}</b></div>
+        ) : (
+          <div className="st-card st-stat"><span>Average per render</span><b>{usd(t.done ? spend / t.done : 0)}</b></div>
+        )}
         <Link className="st-card st-stat st-stat-link" href={toQuery(f, { show: f.unassigned ? undefined : "unassigned", page: undefined }) || "?"}>
           <span>Unassigned</span>
           <b>{num(t.unassigned)}</b>
@@ -258,9 +312,9 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
         </Link>
       </section>
 
-      {t.unpriced > 0 ? (
+      {unpriced > 0 ? (
         <p className="st-note" role="status">
-          {num(t.unpriced)} render{t.unpriced === 1 ? " has" : "s have"} no price yet, so {t.unpriced === 1 ? "it isn't" : "they aren't"} in the total.
+          Some usage ({num(unpriced)} {keyMode ? "day" : "render"}{unpriced === 1 ? "" : "s"}) is on a model with no price yet, so it isn&apos;t in the total.
           {isAdmin ? <> Add the model in <Link href="/studio/settings">Settings</Link>.</> : " Ask an admin to add the model's price."}
         </p>
       ) : null}
@@ -281,7 +335,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
             ))}
           </div>
         </div>
-        {breakdown.length ? (
+        {shownBreakdown.length ? (
           <div className="st-table-wrap">
             <table className="st-table">
               <thead>
@@ -294,7 +348,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
                 </tr>
               </thead>
               <tbody>
-                {breakdown.map((b) => (
+                {shownBreakdown.map((b) => (
                   <tr key={String(b.key)}>
                     <td>
                       {f.group === "project" && b.project_id ? (
@@ -401,7 +455,10 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
       </section>
 
       <p className="st-muted st-small st-foot">
-        Spend is worked out from each render&apos;s BytePlus tokens and the price list in Settings. Times are {tz}.
+        {keyMode
+          ? "Spent and the chart come from BytePlus's usage per API key, updated hourly. Projects and videos come from ComfyUI runs. "
+          : "Spend is worked out from each render's BytePlus tokens and the price list in Settings. "}
+        Times are {tz}.
       </p>
     </>
   );

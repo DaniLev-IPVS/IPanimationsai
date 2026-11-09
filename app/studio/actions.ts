@@ -16,6 +16,7 @@ import {
 import { getTimezone, isUuid, one, q } from "@/lib/studio/db";
 import { parseFilters, whereOf } from "@/lib/studio/filters";
 import { fetchTaskPage, matchComfy, repriceUnpriced, syncAll } from "@/lib/studio/sync";
+import { importKeyUsage, priceKeyUsage } from "@/lib/studio/usage";
 
 const text = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 const fail = (path: string, message: string): never => redirect(`${path}?e=${encodeURIComponent(message)}`);
@@ -185,6 +186,45 @@ export async function setVideoStatus(fd: FormData) {
   done();
 }
 
+// ── Usage by API key (admin) ───────────────────────────────────────────────
+
+export async function saveUsageAccess(fd: FormData) {
+  await requireAdmin();
+  const id = text(fd, "access_id");
+  const secret = text(fd, "access_secret");
+  if (!id || !secret) fail("/studio/settings", "Paste both the Access Key ID and the Secret Access Key.");
+  let problem = "";
+  try {
+    // Proves the key works and does the first import in one go.
+    await importKeyUsage({ id, secret });
+  } catch (e) {
+    problem = e instanceof Error ? e.message : "BytePlus rejected the access key.";
+  }
+  if (problem) fail("/studio/settings", `That access key didn't work. ${problem}`);
+  await q(
+    `insert into studio.settings (key, value) values ('byteplus_access', $1)
+     on conflict (key) do update set value = excluded.value`,
+    [encryptSecret(JSON.stringify({ id, secret }))],
+  );
+  await q(`delete from studio.settings where key = 'usage_error'`);
+  done();
+}
+
+export async function removeUsageAccess() {
+  await requireAdmin();
+  await q(`delete from studio.settings where key in ('byteplus_access', 'usage_error')`);
+  done();
+}
+
+export async function setKeyOwner(fd: FormData) {
+  await requireAdmin();
+  const id = Number(text(fd, "id"));
+  const owner = text(fd, "owner");
+  if (!Number.isFinite(id) || (owner && !isUuid(owner))) return;
+  await q(`update studio.bp_keys set owner_id = $2 where id = $1`, [id, owner || null]);
+  done();
+}
+
 // ── Naming rules (admin): "if the file name contains X, it's this project" ─
 
 export async function addNameRule(fd: FormData) {
@@ -290,6 +330,7 @@ export async function saveRate(fd: FormData) {
     [model, resolution, value],
   );
   await repriceUnpriced();
+  await priceKeyUsage();
   done();
 }
 

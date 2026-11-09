@@ -1,7 +1,7 @@
 import type { StudioUser } from "./auth";
 import { isUuid } from "./db";
 
-export type Group = "day" | "project" | "video" | "model" | "person";
+export type Group = "day" | "project" | "video" | "model" | "person" | "key";
 export type Range = "7d" | "30d" | "month" | "lastmonth" | "all" | "custom";
 
 export type Filters = {
@@ -18,7 +18,7 @@ export type Filters = {
 
 type Params = Record<string, string | string[] | undefined>;
 
-const GROUPS: Group[] = ["day", "project", "video", "model", "person"];
+const GROUPS: Group[] = ["day", "project", "video", "model", "person", "key"];
 const RANGES: Range[] = ["7d", "30d", "month", "lastmonth", "all", "custom"];
 const isDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 

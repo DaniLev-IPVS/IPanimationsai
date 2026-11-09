@@ -5,12 +5,101 @@ import {
   addUser,
   createSetupLink,
   deleteRate,
+  removeUsageAccess,
   saveRate,
   saveTimezone,
+  saveUsageAccess,
   setApiKeyActive,
+  setKeyOwner,
   setUserActive,
 } from "../../actions";
-import { RevealAction, SubmitButton } from "../../ui";
+import { AutoSelect, RevealAction, SubmitButton } from "../../ui";
+import { usd } from "@/lib/studio/filters";
+
+type KeyRow = { id: string; name: string; masked_key: string | null; last_access: string | null; owner_id: string | null; spend: string; requests: number };
+
+function UsageByKey({
+  connected,
+  syncedAt,
+  error,
+  keys,
+  people,
+}: {
+  connected: boolean;
+  syncedAt: string;
+  error: string | null;
+  keys: KeyRow[];
+  people: { id: string; name: string }[];
+}) {
+  return (
+    <section className="st-card st-panel">
+      <div className="st-panel-head">
+        <h2>Spend by API key</h2>
+        {connected ? <span className="st-chip st-chip-active">Connected</span> : <span className="st-chip">Not connected</span>}
+      </div>
+      <p className="st-muted st-small">
+        BytePlus reports usage per API key. That decides who spent what: each person sees only the keys set to them below. Keys not set to anyone count as yours.
+      </p>
+      {connected ? (
+        <>
+          <p className="st-small">
+            Last update: {syncedAt}.
+            {error ? <span className="st-error-text">{error}</span> : null}
+          </p>
+          {keys.length ? (
+            <div className="st-table-wrap">
+              <table className="st-table">
+                <thead><tr><th>Key</th><th>Used by</th><th className="num">Last 30 days</th><th /></tr></thead>
+                <tbody>
+                  {keys.map((k) => (
+                    <tr key={k.id}>
+                      <td>
+                        {k.name}
+                        <small className="st-muted">
+                          {k.masked_key ? `ends in ${k.masked_key.slice(-4)}` : "not seen in BytePlus yet"}
+                        </small>
+                      </td>
+                      <td>
+                        <form action={setKeyOwner}>
+                          <input type="hidden" name="id" value={k.id} />
+                          <AutoSelect name="owner" defaultValue={k.owner_id || ""} label={`Who uses ${k.name}`}>
+                            <option value="">You (account owner)</option>
+                            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                          </AutoSelect>
+                        </form>
+                      </td>
+                      <td className="num">{usd(k.spend)}<small className="st-muted">{k.requests} requests</small></td>
+                      <td />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="st-empty">No keys found yet.</p>
+          )}
+          <form action={removeUsageAccess}>
+            <button className="st-link" type="submit">Disconnect</button>
+          </form>
+        </>
+      ) : (
+        <>
+          <ol className="st-steps">
+            <li>In the BytePlus console, open <b>Identity and Access Management</b>, then <b>Users</b>, and create a user for this dashboard with programmatic access.</li>
+            <li>Give that user read-only access to ModelArk. In its permissions, search for <b>Ark</b> and choose the read-only policy.</li>
+            <li>Create an access key for that user, then paste both parts here.</li>
+          </ol>
+          <form action={saveUsageAccess} className="st-form-row" autoComplete="off">
+            <label>Access Key ID <input name="access_id" autoComplete="off" required /></label>
+            <label>Secret Access Key <input name="access_secret" type="password" autoComplete="off" required /></label>
+            <SubmitButton className="st-btn st-btn-primary" pendingLabel="Checking…">Connect</SubmitButton>
+          </form>
+          <p className="st-muted st-small">Stored encrypted and never shown again. It&apos;s only used to read usage and key names.</p>
+        </>
+      )}
+    </section>
+  );
+}
 
 const fmt = (v: string | null, tz: string) =>
   v ? new Date(v).toLocaleString("en-US", { timeZone: tz, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Never";
@@ -90,6 +179,18 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
     );
   }
 
+  const [access, usageMeta, bpKeys] = await Promise.all([
+    one(`select 1 from studio.settings where key = 'byteplus_access'`),
+    q<{ key: string; value: string }>(`select key, value from studio.settings where key in ('usage_synced_at', 'usage_error')`),
+    q<KeyRow>(
+      `select b.id::text, b.name, b.masked_key, b.last_access, b.owner_id,
+              coalesce(sum(k.cost_usd), 0) as spend, coalesce(sum(k.requests), 0)::int as requests
+         from studio.bp_keys b
+         left join studio.key_usage k on k.bp_key_id = b.id and k.day >= current_date - 30
+        group by b.id order by b.name`,
+    ),
+  ]);
+  const meta = (k: string) => usageMeta.find((m) => m.key === k)?.value || null;
   const [users, keys, rates, unpriced] = await Promise.all([
     q<{ id: string; name: string; email: string; role: string; active: boolean; has_password: boolean; comfy_last_seen: string | null }>(
       `select id, name, email, role, active, password_hash is not null as has_password, comfy_last_seen from studio.users order by created_at`,
@@ -160,8 +261,17 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
         </form>
       </section>
 
+      <UsageByKey
+        connected={Boolean(access)}
+        syncedAt={fmt(meta("usage_synced_at"), tz)}
+        error={meta("usage_error")}
+        keys={bpKeys}
+        people={users.filter((u) => u.active && u.role !== "admin").map((u) => ({ id: u.id, name: u.name }))}
+      />
+
       <section className="st-card st-panel">
-        <h2>BytePlus keys</h2>
+        <h2>Render list access</h2>
+        <p className="st-muted st-small">One key is enough to read every render on the account. Who a render belongs to comes from ComfyUI runs, not from this key.</p>
         {keys.length ? (
           <div className="st-table-wrap">
             <table className="st-table">

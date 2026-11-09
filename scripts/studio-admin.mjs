@@ -74,6 +74,24 @@ const SCHEMA = [
     created_at timestamptz not null default now()
   )`,
   `create unique index if not exists name_rules_text on studio.name_rules (lower(match_text))`,
+  `create table if not exists studio.bp_keys (
+    id bigint primary key,
+    name text not null,
+    masked_key text,
+    last_access text,
+    status text,
+    owner_id uuid references studio.users(id) on delete set null
+  )`,
+  `create table if not exists studio.key_usage (
+    day date not null,
+    auth_token text not null,
+    model text not null,
+    total_tokens bigint not null default 0,
+    requests int not null default 0,
+    bp_key_id bigint references studio.bp_keys(id) on delete set null,
+    cost_usd numeric(12,4),
+    primary key (day, auth_token, model)
+  )`,
   `create table if not exists studio.api_keys (
     id uuid primary key default gen_random_uuid(),
     label text not null,
