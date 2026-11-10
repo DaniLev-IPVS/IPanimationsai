@@ -182,7 +182,7 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
 
   const [access, usageMeta, bpKeys] = await Promise.all([
     one(`select 1 from studio.settings where key = 'byteplus_access'`),
-    q<{ key: string; value: string }>(`select key, value from studio.settings where key in ('usage_synced_at', 'usage_error')`),
+    q<{ key: string; value: string }>(`select key, value from studio.settings where key in ('usage_synced_at', 'usage_error', 'bill_error')`),
     q<KeyRow>(
       `select b.id::text, b.name, b.masked_key, b.last_access, b.owner_id,
               coalesce(sum(k.cost_usd), 0) as spend, coalesce(sum(k.requests), 0)::int as requests
@@ -199,7 +199,7 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
     q<{ id: string; label: string; last4: string; active: boolean; last_sync_at: string | null; last_sync_error: string | null }>(
       `select id, label, last4, active, last_sync_at, last_sync_error from studio.api_keys order by created_at`,
     ),
-    q<{ model: string; resolution: string; usd_per_million: string }>(`select model, resolution, usd_per_million from studio.rates order by model, resolution`),
+    q<{ model: string; resolution: string; usd_per_million: string; with_video_usd: string | null }>(`select model, resolution, usd_per_million, with_video_usd from studio.rates order by model, resolution`),
     q<{ model: string; resolution: string | null; n: number }>(
       `select model, resolution, count(*)::int as n from studio.renders where status = 'succeeded' and cost_usd is null group by 1, 2 order by 3 desc`,
     ),
@@ -264,7 +264,7 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
       <UsageByKey
         connected={Boolean(access)}
         syncedAt={fmt(meta("usage_synced_at"), tz)}
-        error={meta("usage_error")}
+        error={[meta("usage_error"), meta("bill_error") ? `Couldn't read the bill, so dollars are estimates: ${meta("bill_error")}` : null].filter(Boolean).join(" ") || null}
         keys={bpKeys}
         people={users.filter((u) => u.active || bpKeys.some((k) => k.owner_id === u.id)).map((u) => ({ id: u.id, name: u.name }))}
         defaultOwner={users.find((u) => u.active && u.role === "admin")?.id || user.id}
@@ -312,7 +312,7 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
 
       <section className="st-card st-panel">
         <h2>Price list</h2>
-        <p className="st-muted st-small">USD per million tokens. A render keeps the price it got when it finished.</p>
+        <p className="st-muted st-small">USD per million tokens. Seedance 2 charges less per token when a render is given a reference video, though the video&apos;s own tokens count too, so those renders use the second price. A render keeps the price it got when it finished.</p>
         {unpriced.length ? (
           <p className="st-note">
             Missing a price: {unpriced.map((u) => `${u.model}${u.resolution ? ` at ${u.resolution}` : ""} (${u.n})`).join(", ")}
@@ -320,13 +320,14 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
         ) : null}
         <div className="st-table-wrap">
           <table className="st-table">
-            <thead><tr><th>Model</th><th>Resolution</th><th className="num">Price</th><th /></tr></thead>
+            <thead><tr><th>Model</th><th>Resolution</th><th className="num">Price</th><th className="num">With a reference video</th><th /></tr></thead>
             <tbody>
               {rates.map((r) => (
                 <tr key={`${r.model}${r.resolution}`}>
                   <td>{r.model}</td>
                   <td>{r.resolution === "*" ? "Any" : r.resolution}</td>
                   <td className="num">${Number(r.usd_per_million).toFixed(2)}</td>
+                  <td className="num">{r.with_video_usd == null ? "Same" : `$${Number(r.with_video_usd).toFixed(2)}`}</td>
                   <td className="num">
                     <form action={deleteRate}>
                       <input type="hidden" name="model" value={r.model} />
@@ -343,6 +344,7 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
           <label>Model or endpoint id <input name="model" required /></label>
           <label>Resolution <input name="resolution" placeholder="720p, or blank for any" /></label>
           <label>Price <input name="rate" type="number" min="0" step="0.0001" required /></label>
+          <label>With a reference video <input name="with_video" type="number" min="0" step="0.0001" placeholder="Same" /></label>
           <SubmitButton pendingLabel="Saving…">Save price</SubmitButton>
         </form>
       </section>

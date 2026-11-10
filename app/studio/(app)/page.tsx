@@ -119,6 +119,10 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
   const f = parseFilters(searchParams, tz, user);
   const isAdmin = user.role === "admin";
   const { where, params } = whereOf(f, user);
+  // Unassigned renders aren't under any project, so a project filter would
+  // hide them. They're counted without it, ready to be filed.
+  const pool = whereOf(f, user, { skipProject: true });
+  const onProject = Boolean(f.project) && f.project !== "none";
   const g = GROUP_SQL[f.group];
 
   // BytePlus usage per API key is the truth for "who spent what". It can't be
@@ -159,17 +163,21 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
   const monthly = chartDays > 62;
   const bucketFormat = is24h ? "YYYY-MM-DD HH24" : monthly ? "YYYY-MM" : "YYYY-MM-DD";
 
-  const [totals, series, breakdown, renders, projectRows, videoRows, people, keys] = await Promise.all([
-    q<{ spend: string; done: number; failed: number; unassigned: number; unassigned_spend: string; unpriced: number; tokens: string }>(
+  const [totals, waiting, series, breakdown, renders, projectRows, videoRows, people, keys] = await Promise.all([
+    q<{ spend: string; pending: string; done: number; failed: number; unpriced: number; tokens: string }>(
       `select coalesce(sum(r.cost_usd) filter (where r.status = 'succeeded'), 0) as spend,
+              coalesce(sum(r.cost_usd) filter (where r.status = 'succeeded' and coalesce(r.cost_source, '') not in ('bill', 'bill_rate')), 0) as pending,
               count(*) filter (where r.status = 'succeeded')::int as done,
               count(*) filter (where r.status = 'failed')::int as failed,
-              count(*) filter (where r.status = 'succeeded' and r.project_id is null)::int as unassigned,
-              coalesce(sum(r.cost_usd) filter (where r.status = 'succeeded' and r.project_id is null), 0) as unassigned_spend,
               count(*) filter (where r.status = 'succeeded' and r.cost_usd is null)::int as unpriced,
               coalesce(sum(r.total_tokens) filter (where r.status = 'succeeded'), 0) as tokens
          from studio.renders r where ${where}`,
       params,
+    ),
+    q<{ n: number; spend: string }>(
+      `select count(*)::int as n, coalesce(sum(r.cost_usd), 0) as spend
+         from studio.renders r where ${pool.where} and r.status = 'succeeded' and r.project_id is null`,
+      pool.params,
     ),
     q<{ bucket: string; spend: string; n: number }>(
       `select to_char(r.created_at at time zone $2::text, '${bucketFormat}') as bucket,
@@ -188,10 +196,10 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
     q<{
       id: string; model: string; status: string; resolution: string | null; ratio: string | null; duration_s: string | null;
       total_tokens: string | null; cost_usd: string | null; when_label: string; project_id: string | null; video_id: string | null;
-      comfy_hint: string | null; assigned_via: string | null; user_id: string; person: string;
+      comfy_hint: string | null; assigned_via: string | null; user_id: string; person: string; video_input: boolean | null; cost_source: string | null;
     }>(
       `select r.id, r.model, r.status, r.resolution, r.ratio, r.duration_s, r.total_tokens, r.cost_usd, r.project_id, r.video_id,
-              r.comfy_hint, r.assigned_via, r.user_id, u.name as person,
+              r.comfy_hint, r.assigned_via, r.user_id, u.name as person, r.video_input, r.cost_source,
               to_char(r.created_at at time zone $2::text, 'Mon FMDD, HH24:MI') as when_label
          from studio.renders r join studio.users u on u.id = r.user_id
         where ${where} order by r.created_at desc limit ${PAGE + 1} offset ${(f.page - 1) * PAGE}`,
@@ -205,8 +213,9 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
 
   const [keyTotals, keySeries, keyBreakdown] = usageOn
     ? await Promise.all([
-        q<{ spend: string; unpriced: number; requests: number }>(
-          `select coalesce(sum(k.cost_usd), 0) as spend, count(*) filter (where k.cost_usd is null and k.total_tokens > 0)::int as unpriced,
+        q<{ spend: string; pending: string; unpriced: number; requests: number }>(
+          `select coalesce(sum(k.cost_usd), 0) as spend, coalesce(sum(k.cost_usd) filter (where k.cost_source is distinct from 'bill'), 0) as pending,
+                  count(*) filter (where k.cost_usd is null and k.total_tokens > 0)::int as unpriced,
                   coalesce(sum(k.requests), 0)::int as requests
              from ${kFrom} where ${kWhere}`,
           kParams,
@@ -227,8 +236,25 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
     : [[], [], []];
 
   const t = totals[0];
+  const unassigned = waiting[0]?.n || 0;
+  const unassignedSpend = waiting[0]?.spend || 0;
   const spend = keyMode ? Number(keyTotals[0]?.spend || 0) : Number(t.spend);
   const unpriced = keyMode ? keyTotals[0]?.unpriced || 0 : t.unpriced;
+  // Work BytePlus hasn't billed yet (usually under 2 hours old) is estimated.
+  const pending = keyMode ? Number(keyTotals[0]?.pending || 0) : Number(t.pending);
+  const billCheck = isAdmin && usageOn && !keyOwner && !f.project && !f.unassigned
+    ? Number(
+        (
+          await one<{ usd: string }>(
+            `select coalesce(sum(l.amount_usd), 0) as usd from studio.bill_lines l
+              where l.product <> 'ModelArk_resource_packages'
+                and l.begin_at >= ($1::date::timestamp at time zone $3::text) and l.begin_at < (($2::date + 1)::timestamp at time zone $3::text)
+                ${is24h ? `and l.begin_at >= ${LAST_24H}` : ""}`,
+            [f.from, f.to, tz],
+          )
+        )?.usd || 0,
+      )
+    : null;
   const shownBreakdown = fromUsage ? keyBreakdown : breakdown;
   const options: Option[] = projectRows.map((p) => ({
     ...p,
@@ -325,6 +351,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
               </select>
             </label>
           ) : null}
+          {f.range !== "custom" ? <input type="hidden" name="range" value={f.range} /> : null}
           {f.group !== "day" ? <input type="hidden" name="group" value={f.group} /> : null}
           <button className="st-btn" type="submit">Apply</button>
         </form>
@@ -334,7 +361,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
         <div className="st-card st-stat st-stat-hero">
           <span>Spent</span>
           <b>{usd(spend)}</b>
-          <small className="st-muted">{keyMode ? `Measured by BytePlus on ${measuredFor}` : f.project ? "Renders filed under this project" : "From renders"}</small>
+          <small className="st-muted">{keyMode ? `Billed by BytePlus on ${measuredFor}` : f.project ? "Billed for renders filed under this project" : "Billed by BytePlus, per render"}</small>
         </div>
         <div className="st-card st-stat"><span>Finished renders</span><b>{num(t.done)}</b></div>
         {keyMode ? (
@@ -342,16 +369,22 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
         ) : (
           <div className="st-card st-stat"><span>Average per render</span><b>{usd(t.done ? spend / t.done : 0)}</b></div>
         )}
-        <Link className="st-card st-stat st-stat-link" href={toQuery(f, { show: f.unassigned ? undefined : "unassigned", page: undefined }) || "?"}>
+        <Link className="st-card st-stat st-stat-link" href={toQuery(f, { show: f.unassigned ? undefined : "unassigned", project: f.unassigned ? f.project || undefined : undefined, page: undefined }) || "?"}>
           <span>Unassigned</span>
-          <b>{num(t.unassigned)}</b>
-          <small className="st-muted">{usd(t.unassigned_spend)}, {f.unassigned ? "show all" : "show them"}</small>
+          <b>{num(unassigned)}</b>
+          <small className="st-muted">{usd(unassignedSpend)}, {f.unassigned ? "show all" : "show them"}</small>
         </Link>
       </section>
 
+      {pending >= 0.01 ? (
+        <p className="st-muted st-small" role="status">
+          Includes {usd(pending)} estimated for work BytePlus hasn&apos;t billed yet. Its bill catches up within about 2 hours, then the exact charge replaces the estimate.
+        </p>
+      ) : null}
+
       {unpriced > 0 ? (
         <p className="st-note" role="status">
-          Some usage ({num(unpriced)} {keyMode ? "day" : "render"}{unpriced === 1 ? "" : "s"}) is on a model with no price yet, so it isn&apos;t in the total.
+          Some usage ({num(unpriced)} {keyMode ? "hour" : "render"}{unpriced === 1 ? "" : "s"}) isn&apos;t on BytePlus&apos;s bill yet and is on a model with no estimate price, so it isn&apos;t in the total.
           {isAdmin ? <> Add the model in <Link href="/studio/settings">Settings</Link>.</> : " Ask an admin to add the model's price."}
         </p>
       ) : null}
@@ -414,18 +447,22 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
 
       <section className="st-card st-panel">
         <h2>Renders</h2>
-        {t.unassigned > 0 && activeOptions.length ? (
-          <form action={bulkAssign} className="st-bulk">
-            <input type="hidden" name="qs" value={toQuery(f, { page: undefined, show: undefined }).replace(/^\?/, "")} />
-            <span>Put all {num(t.unassigned)} unassigned renders from this view on</span>
-            <select name="target" required aria-label="Project or video" defaultValue="">
+        {unassigned > 0 && activeOptions.length ? (
+          <form action={bulkAssign} className="st-bulk" key={f.project}>
+            <input type="hidden" name="qs" value={toQuery(f, { page: undefined, show: undefined, project: undefined }).replace(/^\?/, "")} />
+            <span>
+              {onProject
+                ? `${num(unassigned)} render${unassigned === 1 ? "" : "s"} from this period (${usd(unassignedSpend)}) ${unassigned === 1 ? "isn't" : "aren't"} on any project yet. Put ${unassigned === 1 ? "it" : "them all"} on`
+                : `Put all ${num(unassigned)} unassigned renders from this view on`}
+            </span>
+            <select name="target" required aria-label="Project or video" defaultValue={onProject && activeOptions.some((p) => p.id === f.project) ? `${f.project}|` : ""}>
               <option value="" disabled>Choose a project</option>
               <ProjectOptions options={activeOptions} />
             </select>
             <SubmitButton pendingLabel="Saving…">Assign all</SubmitButton>
           </form>
         ) : null}
-        {t.unassigned > 0 && !activeOptions.length ? (
+        {unassigned > 0 && !activeOptions.length ? (
           <p className="st-note"><Link href="/studio/projects">Add a project</Link> to start assigning renders.</p>
         ) : null}
         {rows.length ? (
@@ -447,7 +484,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
                     <td>
                       {shortModel(r.model)}
                       <small className="st-muted">
-                        {[r.resolution, r.ratio, r.duration_s ? `${Number(r.duration_s)}s` : null].filter(Boolean).join(" · ")}
+                        {[r.resolution, r.ratio, r.duration_s ? `${Number(r.duration_s)}s` : null, r.video_input ? "reference video" : null].filter(Boolean).join(" · ")}
                         {r.status !== "succeeded" ? ` · ${r.status}` : ""}
                       </small>
                     </td>
@@ -472,7 +509,13 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
                       </form>
                       {r.comfy_hint ? <small className="st-muted">ComfyUI: {r.comfy_hint}</small> : null}
                     </td>
-                    <td className="num">{r.status !== "succeeded" ? "–" : r.cost_usd == null ? "No price" : usd(r.cost_usd)}</td>
+                    <td className="num">
+                      {r.status !== "succeeded" ? "–" : r.cost_usd == null ? "Not billed yet" : r.cost_source === "bill" ? usd(r.cost_usd) : r.cost_source === "bill_rate" ? (
+                        <span title="Billed together with other renders, so this is the rate BytePlus charged right then times this render's tokens">{usd(r.cost_usd)}</span>
+                      ) : (
+                        <span title="Estimate until BytePlus bills this render, usually within 2 hours">~{usd(r.cost_usd)}</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -480,7 +523,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
           </div>
         ) : (
           <p className="st-empty">
-            {noKeys ? (isAdmin ? <>Add a BytePlus key in <Link href="/studio/settings">Settings</Link> and renders will show up here.</> : "Renders will show up here once a BytePlus key is connected.") : keyMode && spend > 0 ? "BytePlus has the totals for this period, but it only lists individual renders for about 7 days, and the newest can take up to 30 minutes to match." : "No renders in this period."}
+            {noKeys ? (isAdmin ? <>Add a BytePlus key in <Link href="/studio/settings">Settings</Link> and renders will show up here.</> : "Renders will show up here once a BytePlus key is connected.") : keyMode && spend > 0 ? "BytePlus has the totals for this period, but it only lists individual renders for about 7 days, and the newest can take up to 30 minutes to match." : onProject ? "No renders filed under this project in this period." : "No renders in this period."}
           </p>
         )}
         {f.page > 1 || hasMore ? (
@@ -493,8 +536,9 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
 
       <p className="st-muted st-small st-foot">
         {keyMode
-          ? "Spent and the chart come from BytePlus's usage per API key. BytePlus reports it 5 to 30 minutes late, and this page refreshes every 15 minutes. Projects and videos come from ComfyUI runs. "
-          : "Spend is worked out from each render's BytePlus tokens and the price list in Settings. "}
+          ? "Dollars are what BytePlus billed, tied to each API key's usage hour by hour. Projects and videos come from ComfyUI runs. "
+          : "Each render's cost is its line on BytePlus's bill. A cost with ~ is an estimate until that line arrives. "}
+        {billCheck != null ? `BytePlus's bill for this period so far: ${usd(billCheck)}. ` : ""}
         Times are {tz}.
       </p>
     </>

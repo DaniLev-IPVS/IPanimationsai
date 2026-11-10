@@ -1,5 +1,6 @@
 import { decryptSecret } from "./auth";
 import { q } from "./db";
+import { rateFor, usedVideo, type Rate } from "./pricing";
 import { importKeyUsage } from "./usage";
 
 /**
@@ -23,6 +24,7 @@ type Task = {
   resolution?: string;
   ratio?: string;
   duration?: number;
+  framespersecond?: number;
   created_at: number;
   updated_at?: number;
   usage?: { total_tokens?: number; completion_tokens?: number };
@@ -39,17 +41,17 @@ export async function fetchTaskPage(apiKey: string, page: number, size = PAGE_SI
   return { items: body.items || [], total: body.total || 0 };
 }
 
-type Rate = { model: string; resolution: string; usd_per_million: string };
+const tokensOf = (task: Task) => task.usage?.total_tokens ?? task.usage?.completion_tokens ?? null;
+
+const videoOf = (task: Task) =>
+  usedVideo({ resolution: task.resolution, duration: task.duration, tokens: tokensOf(task), fps: task.framespersecond });
 
 function priceOf(task: Task, rates: Rate[]): number | null {
   if (task.status !== "succeeded") return 0;
-  const tokens = task.usage?.total_tokens ?? task.usage?.completion_tokens;
+  const tokens = tokensOf(task);
   if (tokens == null) return null;
-  const res = (task.resolution || "").toLowerCase();
-  const rate =
-    rates.find((r) => r.model === task.model && r.resolution === res) ||
-    rates.find((r) => r.model === task.model && r.resolution === "*");
-  return rate ? (tokens / 1_000_000) * Number(rate.usd_per_million) : null;
+  const rate = rateFor(rates, task.model, task.resolution, videoOf(task));
+  return rate == null ? null : (tokens / 1_000_000) * rate;
 }
 
 async function syncKey(key: { id: string; secret_enc: string }, owner: string, rates: Rate[]) {
@@ -65,28 +67,35 @@ async function syncKey(key: { id: string; secret_enc: string }, owner: string, r
       resolution: t.resolution ? t.resolution.toLowerCase() : null,
       ratio: t.ratio ?? null,
       duration_s: t.duration != null && t.duration > 0 ? t.duration : null,
-      total_tokens: t.usage?.total_tokens ?? t.usage?.completion_tokens ?? null,
+      total_tokens: tokensOf(t),
+      video_input: videoOf(t),
       cost_usd: priceOf(t, rates),
+      cost_source: t.status === "succeeded" ? "estimate" : null,
       created_at: new Date(t.created_at * 1000).toISOString(),
       updated_at: t.updated_at ? new Date(t.updated_at * 1000).toISOString() : null,
     }));
-    // A price is locked once set, so editing the list doesn't rewrite history.
+    // The bill's price always wins. An estimate is locked once set, so editing
+    // the price list doesn't rewrite history.
     await q(
       `insert into studio.renders
-         (id, api_key_id, user_id, model, status, resolution, ratio, duration_s, total_tokens, cost_usd, created_at, updated_at)
-       select x.id, $2::uuid, $3::uuid, x.model, x.status, x.resolution, x.ratio, x.duration_s, x.total_tokens, x.cost_usd, x.created_at, x.updated_at
+         (id, api_key_id, user_id, model, status, resolution, ratio, duration_s, total_tokens, video_input, cost_usd, cost_source, created_at, updated_at)
+       select x.id, $2::uuid, $3::uuid, x.model, x.status, x.resolution, x.ratio, x.duration_s, x.total_tokens, x.video_input, x.cost_usd, x.cost_source, x.created_at, x.updated_at
          from jsonb_to_recordset($1::jsonb) as x(
            id text, model text, status text, resolution text, ratio text, duration_s numeric,
-           total_tokens bigint, cost_usd numeric, created_at timestamptz, updated_at timestamptz)
+           total_tokens bigint, video_input boolean, cost_usd numeric, cost_source text, created_at timestamptz, updated_at timestamptz)
        on conflict (id) do update set
          status = excluded.status,
          resolution = excluded.resolution,
          ratio = excluded.ratio,
          duration_s = excluded.duration_s,
          total_tokens = excluded.total_tokens,
+         video_input = coalesce(case when studio.renders.cost_source in ('bill', 'bill_rate') then studio.renders.video_input end, excluded.video_input),
          updated_at = excluded.updated_at,
-         cost_usd = case when studio.renders.status = 'succeeded' and studio.renders.cost_usd is not null
-                         then studio.renders.cost_usd else excluded.cost_usd end`,
+         cost_usd = case when studio.renders.cost_source in ('bill', 'bill_rate')
+                           or (studio.renders.status = 'succeeded' and studio.renders.cost_usd is not null)
+                         then studio.renders.cost_usd else excluded.cost_usd end,
+         cost_source = case when studio.renders.cost_source in ('bill', 'bill_rate') then studio.renders.cost_source
+                            when studio.renders.cost_usd is not null or excluded.cost_usd is not null then 'estimate' end`,
       [JSON.stringify(rows), key.id, owner],
     );
     seen += items.length;
@@ -95,12 +104,13 @@ async function syncKey(key: { id: string; secret_enc: string }, owner: string, r
   return seen;
 }
 
-/** Fill in renders that had no price, after a rate is added. */
+/** Estimate renders that had no price, after a rate is added. The bill replaces it later. */
 export async function repriceUnpriced() {
   await q(
     `update studio.renders r
-        set cost_usd = (r.total_tokens::numeric / 1000000) * (
-          select a.usd_per_million from studio.rates a
+        set cost_source = 'estimate', cost_usd = (r.total_tokens::numeric / 1000000) * (
+          select case when r.video_input and a.with_video_usd is not null then a.with_video_usd else a.usd_per_million end
+            from studio.rates a
            where a.model = r.model and a.resolution in (coalesce(r.resolution, ''), '*')
            order by (a.resolution = '*') limit 1
         )
@@ -177,7 +187,7 @@ export async function syncAll(): Promise<{ keys: number; tasks: number; errors: 
   const keys = await q<{ id: string; label: string; secret_enc: string }>(
     `select id, label, secret_enc from studio.api_keys where active`,
   );
-  const rates = await q<Rate>(`select model, resolution, usd_per_million from studio.rates`);
+  const rates = await q<Rate>(`select model, resolution, usd_per_million, with_video_usd from studio.rates`);
   const admin = await q<{ id: string }>(`select id from studio.users where role = 'admin' and active order by created_at limit 1`);
   if (!admin.length) return { keys: keys.length, tasks: 0, errors: ["No active admin to file renders under."] };
   const owner = admin[0].id;

@@ -160,33 +160,56 @@ const SCHEMA = [
     key text primary key,
     value text not null
   )`,
+  // Seedance 2.x has a lower price per token when a render is given a reference video.
+  `alter table studio.rates add column if not exists with_video_usd numeric(10,4)`,
+  `alter table studio.renders add column if not exists video_input boolean`,
+  // BytePlus's bill, line by line: what each render actually cost.
+  `create table if not exists studio.bill_lines (
+    id text primary key,
+    bill_period text not null,
+    begin_at timestamptz not null,
+    end_at timestamptz,
+    product text,
+    element text,
+    model text,
+    video_in boolean,
+    tokens bigint,
+    amount_usd numeric(14,6) not null,
+    list_usd numeric(14,6)
+  )`,
+  `create index if not exists bill_lines_begin on studio.bill_lines (begin_at)`,
+  `alter table studio.renders add column if not exists bill_line_id text`,
+  `alter table studio.renders add column if not exists cost_source text`,
+  `alter table studio.key_usage_hourly add column if not exists cost_source text`,
+  `update studio.renders set cost_source = 'estimate' where cost_source is null and cost_usd is not null`,
 ];
 
-// BytePlus ModelArk price list, USD per million tokens, online inference
-// (docs.byteplus.com/docs/ModelArk/1544106, read 2026-11-09). Editable in Settings.
+// BytePlus ModelArk price list, USD per million tokens, online inference: the
+// plain price, then the price with a reference video (V2V). From `arkcli pricing
+// models` on this account, 2026-11-10. Editable in Settings.
 const RATES = [
-  ["dreamina-seedance-2-5-260628", "480p", 10.7],
-  ["dreamina-seedance-2-5-260628", "720p", 10.7],
-  ["dreamina-seedance-2-5-260628", "1080p", 11.7],
-  ["dreamina-seedance-2-0-260128", "480p", 7.0],
-  ["dreamina-seedance-2-0-260128", "720p", 7.0],
-  ["dreamina-seedance-2-0-260128", "1080p", 7.7],
-  ["dreamina-seedance-2-0-260128", "4k", 4.0],
-  ["dreamina-seedance-2-0-fast-260128", "480p", 5.6],
-  ["dreamina-seedance-2-0-fast-260128", "720p", 5.6],
-  ["dreamina-seedance-2-0-mini-260615", "480p", 3.5],
-  ["dreamina-seedance-2-0-mini-260615", "720p", 3.5],
-  ["seedance-1-0-pro-250528", "*", 2.5],
-  ["seedance-1-0-pro-fast-251015", "*", 1.0],
+  ["dreamina-seedance-2-5-260628", "480p", 10.7, 6.4],
+  ["dreamina-seedance-2-5-260628", "720p", 10.7, 6.4],
+  ["dreamina-seedance-2-5-260628", "1080p", 11.7, 7.0],
+  ["dreamina-seedance-2-0-260128", "480p", 7.0, 4.3],
+  ["dreamina-seedance-2-0-260128", "720p", 7.0, 4.3],
+  ["dreamina-seedance-2-0-260128", "1080p", 7.7, 4.7],
+  ["dreamina-seedance-2-0-260128", "4k", 4.0, 2.4],
+  ["dreamina-seedance-2-0-fast-260128", "480p", 5.6, 3.3],
+  ["dreamina-seedance-2-0-fast-260128", "720p", 5.6, 3.3],
+  ["dreamina-seedance-2-0-mini-260615", "480p", 3.5, 2.1],
+  ["dreamina-seedance-2-0-mini-260615", "720p", 3.5, 2.1],
+  ["seedance-1-0-pro-250528", "*", 2.5, null],
+  ["seedance-1-0-pro-fast-251015", "*", 1.0, null],
 ];
 
 async function migrate() {
   for (const stmt of SCHEMA) await run(stmt);
-  for (const [m, res, usd] of RATES) {
+  for (const [m, res, usd, withVideo] of RATES) {
     await run(
-      `insert into studio.rates (model, resolution, usd_per_million) values ($1,$2,$3)
-       on conflict (model, resolution) do nothing`,
-      [m, res, usd],
+      `insert into studio.rates (model, resolution, usd_per_million, with_video_usd) values ($1,$2,$3,$4)
+       on conflict (model, resolution) do update set with_video_usd = coalesce(studio.rates.with_video_usd, excluded.with_video_usd)`,
+      [m, res, usd, withVideo],
     );
   }
   await run(

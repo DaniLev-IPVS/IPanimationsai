@@ -35,22 +35,34 @@ export function addDays(date: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
+/** The dates a preset range covers, or null for a custom one. */
+function presetDates(range: Range, now: string): [string, string] | null {
+  if (range === "24h") return [addDays(now, -1), now];
+  if (range === "7d") return [addDays(now, -6), now];
+  if (range === "30d") return [addDays(now, -29), now];
+  if (range === "month") return [`${now.slice(0, 7)}-01`, now];
+  if (range === "lastmonth") {
+    const lastDay = addDays(`${now.slice(0, 7)}-01`, -1);
+    return [`${lastDay.slice(0, 7)}-01`, lastDay];
+  }
+  if (range === "all") return ["2020-01-01", now];
+  return null;
+}
+
 export function parseFilters(sp: Params, tz: string, user: StudioUser): Filters {
   const get = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : "");
   const now = today(tz);
-  let range = (RANGES.indexOf(get("range") as Range) >= 0 ? get("range") : "30d") as Range;
   let from = get("from");
   let to = get("to");
-  if (isDate(from) && isDate(to) && !get("range")) range = "custom";
+  const datesGiven = isDate(from) && isDate(to);
+  let range = (RANGES.indexOf(get("range") as Range) >= 0 ? get("range") : datesGiven ? "custom" : "30d") as Range;
+  // The filter form sends the preset along with its dates, so Apply keeps
+  // "24 hours" selected unless someone actually changed a date.
+  const preset = presetDates(range, now);
+  if (preset && datesGiven && (from !== preset[0] || to !== preset[1])) range = "custom";
 
-  if (range === "24h") [from, to] = [addDays(now, -1), now];
-  else if (range === "7d") [from, to] = [addDays(now, -6), now];
-  else if (range === "30d") [from, to] = [addDays(now, -29), now];
-  else if (range === "month") [from, to] = [`${now.slice(0, 7)}-01`, now];
-  else if (range === "lastmonth") {
-    const lastDay = addDays(`${now.slice(0, 7)}-01`, -1);
-    [from, to] = [`${lastDay.slice(0, 7)}-01`, lastDay];
-  } else if (range === "all") [from, to] = ["2020-01-01", now];
+  const dates = presetDates(range, now);
+  if (dates) [from, to] = dates;
   else {
     if (!isDate(from)) from = addDays(now, -29);
     if (!isDate(to)) to = now;

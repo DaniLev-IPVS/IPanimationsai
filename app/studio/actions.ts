@@ -322,11 +322,12 @@ export async function saveRate(fd: FormData) {
   const model = text(fd, "model");
   const resolution = text(fd, "resolution").toLowerCase() || "*";
   const value = Number(text(fd, "rate"));
-  if (!model || !(value >= 0)) fail("/studio/settings", "Enter a model and a price.");
+  const withVideo = text(fd, "with_video") ? Number(text(fd, "with_video")) : null;
+  if (!model || !(value >= 0) || (withVideo !== null && !(withVideo >= 0))) fail("/studio/settings", "Enter a model and a price.");
   await q(
-    `insert into studio.rates (model, resolution, usd_per_million) values ($1, $2, $3)
-     on conflict (model, resolution) do update set usd_per_million = excluded.usd_per_million`,
-    [model, resolution, value],
+    `insert into studio.rates (model, resolution, usd_per_million, with_video_usd) values ($1, $2, $3, $4)
+     on conflict (model, resolution) do update set usd_per_million = excluded.usd_per_million, with_video_usd = excluded.with_video_usd`,
+    [model, resolution, value, withVideo],
   );
   await repriceUnpriced();
   await priceKeyUsage();

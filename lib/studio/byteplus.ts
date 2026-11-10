@@ -6,39 +6,43 @@ import { createHash, createHmac } from "node:crypto";
  * over a canonical request, scoped to date/region/service/request.
  */
 
-const HOST = "ark.ap-southeast-1.byteplusapi.com";
-const REGION = "ap-southeast-1";
-const SERVICE = "ark";
-const VERSION = "2024-01-01";
+export type AccessKey = { id: string; secret: string };
+
+type Service = { host: string; region: string; service: string; version: string };
+
+const ARK: Service = { host: "ark.ap-southeast-1.byteplusapi.com", region: "ap-southeast-1", service: "ark", version: "2024-01-01" };
+// The account's bill: what BytePlus actually charged, line by line.
+const BILLING: Service = { host: "open.byteplusapi.com", region: "ap-singapore-1", service: "billing", version: "2022-01-01" };
 
 const sha256hex = (v: string) => createHash("sha256").update(v, "utf8").digest("hex");
 const hmac = (key: Buffer | string, v: string) => createHmac("sha256", key).update(v, "utf8").digest();
+const enc = (v: string) => encodeURIComponent(v).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 
-export type AccessKey = { id: string; secret: string };
-
-export async function arkAction<T = any>(action: string, body: unknown, key: AccessKey): Promise<T> {
-  const payload = JSON.stringify(body ?? {});
+async function signedCall<T>(svc: Service, action: string, key: AccessKey, opts: { body?: unknown; query?: Record<string, string> }): Promise<T> {
+  const method = opts.body === undefined ? "GET" : "POST";
+  const payload = method === "POST" ? JSON.stringify(opts.body ?? {}) : "";
   const now = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const date = now.slice(0, 8);
-  const query = `Action=${encodeURIComponent(action)}&Version=${VERSION}`;
+  const params: Record<string, string> = { Action: action, Version: svc.version, ...(opts.query || {}) };
+  const query = Object.keys(params).sort().map((k) => `${enc(k)}=${enc(params[k])}`).join("&");
   const bodyHash = sha256hex(payload);
 
   const headers: Record<string, string> = {
     "content-type": "application/json",
-    host: HOST,
+    host: svc.host,
     "x-content-sha256": bodyHash,
     "x-date": now,
   };
   const signed = Object.keys(headers).sort();
   const canonicalHeaders = signed.map((h) => `${h}:${headers[h]}\n`).join("");
-  const canonicalRequest = ["POST", "/", query, canonicalHeaders, signed.join(";"), bodyHash].join("\n");
-  const scope = `${date}/${REGION}/${SERVICE}/request`;
+  const canonicalRequest = [method, "/", query, canonicalHeaders, signed.join(";"), bodyHash].join("\n");
+  const scope = `${date}/${svc.region}/${svc.service}/request`;
   const stringToSign = ["HMAC-SHA256", now, scope, sha256hex(canonicalRequest)].join("\n");
-  const signingKey = hmac(hmac(hmac(hmac(key.secret, date), REGION), SERVICE), "request");
+  const signingKey = hmac(hmac(hmac(hmac(key.secret, date), svc.region), svc.service), "request");
   const signature = createHmac("sha256", signingKey).update(stringToSign, "utf8").digest("hex");
 
-  const res = await fetch(`https://${HOST}/?${query}`, {
-    method: "POST",
+  const res = await fetch(`https://${svc.host}/?${query}`, {
+    method,
     cache: "no-store",
     headers: {
       "Content-Type": headers["content-type"],
@@ -46,7 +50,7 @@ export async function arkAction<T = any>(action: string, body: unknown, key: Acc
       "X-Date": now,
       Authorization: `HMAC-SHA256 Credential=${key.id}/${scope}, SignedHeaders=${signed.join(";")}, Signature=${signature}`,
     },
-    body: payload,
+    body: method === "POST" ? payload : undefined,
   });
   const text = await res.text();
   let json: any = null;
@@ -61,6 +65,42 @@ export async function arkAction<T = any>(action: string, body: unknown, key: Acc
     throw new Error(`BytePlus ${action} failed (${res.status}). ${detail}`);
   }
   return json.Result as T;
+}
+
+export const arkAction = <T = any>(action: string, body: unknown, key: AccessKey) => signedCall<T>(ARK, action, key, { body: body ?? {} });
+
+export type BillLine = {
+  BillDetailId: string;
+  BillID: string;
+  BillPeriod: string;
+  Product: string;
+  Element: string;
+  ExpandField: string;
+  ExpenseBeginTime: string;
+  ExpenseEndTime: string;
+  Count: string;
+  Unit: string;
+  PretaxAmount: string;
+  OriginalBillAmount: string;
+  Currency: string;
+};
+
+/**
+ * Every charge on the bill for one month ("2026-11"), one line per render for
+ * Seedance 2 and per few minutes for older models. Times are Singapore time.
+ * A charge reaches the bill a few minutes to a couple of hours after the render.
+ */
+export async function listBillLines(key: AccessKey, period: string): Promise<BillLine[]> {
+  const out: BillLine[] = [];
+  for (let offset = 0; offset < 50000; offset += 100) {
+    const result = await signedCall<{ List?: BillLine[]; Total?: number }>(BILLING, "ListBillDetail", key, {
+      query: { BillPeriod: period, Limit: "100", Offset: String(offset), NeedRecordNum: "1", GroupTerm: "0", GroupPeriod: "2" },
+    });
+    const items = result.List || [];
+    out.push(...items);
+    if (items.length < 100 || out.length >= (result.Total || 0)) break;
+  }
+  return out;
 }
 
 export type ApiKeyItem = { Id: number; Name: string; Key: string; LastAccessTime?: string; Status?: string };
