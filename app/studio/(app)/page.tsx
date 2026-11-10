@@ -130,12 +130,24 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
   const kParams: unknown[] = [f.from, f.to, tz];
   let kWhere = `k.at >= ($1::date::timestamp at time zone $3::text) and k.at < (($2::date + 1)::timestamp at time zone $3::text)`;
   if (is24h) kWhere += ` and k.at >= ${LAST_24H}`;
+  // A key nobody is set to counts as the admin's.
+  const admin = await one<{ id: string }>(`select id from studio.users where role = 'admin' and active order by created_at limit 1`);
+  const kOwner = `coalesce(b.owner_id, ${admin ? `'${admin.id}'::uuid` : "null::uuid"})`;
   if (keyOwner) {
-    const admin = await one<{ id: string }>(`select id from studio.users where role = 'admin' and active order by created_at limit 1`);
-    kParams.push(admin?.id ?? null, keyOwner);
-    kWhere += ` and coalesce(b.owner_id, $4::uuid) = $5::uuid`;
+    kParams.push(keyOwner);
+    kWhere += ` and ${kOwner} = $4::uuid`;
   }
   const kFrom = `studio.key_usage_hourly k left join studio.bp_keys b on b.id = k.bp_key_id`;
+  const kDay = `to_char(k.at at time zone $3::text, 'YYYY-MM-DD')`;
+  // Project and video aren't in BytePlus's usage; everything else is.
+  const kGroups: Partial<Record<Group, { key: string; label: string; join: string }>> = {
+    key: { key: "coalesce(b.id::text, k.auth_token)", label: "coalesce(b.name, 'Unknown key ' || k.auth_token)", join: "" },
+    day: { key: kDay, label: kDay, join: "" },
+    model: { key: "k.model", label: "k.model", join: "" },
+    person: { key: `${kOwner}::text`, label: "coalesce(u.name, 'Unknown')", join: `left join studio.users u on u.id = ${kOwner}` },
+  };
+  const kGroup = kGroups[f.group] ?? kGroups.key!;
+  const fromUsage = usageOn && Boolean(kGroups[f.group]) && (keyMode || f.group === "key");
 
   const firstRender = f.range === "all"
     ? keyMode
@@ -205,10 +217,10 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
           kParams,
         ),
         q<{ key: string | null; label: string; spend: string; n: number; tokens: string; project_id: string | null }>(
-          `select coalesce(b.id::text, k.auth_token) as key, coalesce(b.name, 'Unknown key ' || k.auth_token) as label,
+          `select ${kGroup.key} as key, ${kGroup.label} as label,
                   coalesce(sum(k.cost_usd), 0) as spend, coalesce(sum(k.requests), 0)::int as n, coalesce(sum(k.total_tokens), 0) as tokens,
                   null as project_id
-             from ${kFrom} where ${kWhere} group by 1, 2 order by 3 desc`,
+             from ${kFrom} ${kGroup.join} where ${kWhere} group by 1, 2 order by ${f.group === "day" ? "1 desc" : "3 desc"}`,
           kParams,
         ),
       ])
@@ -217,7 +229,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
   const t = totals[0];
   const spend = keyMode ? Number(keyTotals[0]?.spend || 0) : Number(t.spend);
   const unpriced = keyMode ? keyTotals[0]?.unpriced || 0 : t.unpriced;
-  const shownBreakdown = f.group === "key" ? keyBreakdown : breakdown;
+  const shownBreakdown = fromUsage ? keyBreakdown : breakdown;
   const options: Option[] = projectRows.map((p) => ({
     ...p,
     videos: videoRows.filter((v) => v.project_id === p.id),
@@ -366,7 +378,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
               <thead>
                 <tr>
                   <th>{groups.filter(([gr]) => gr === f.group)[0][1]}</th>
-                  <th className="num">Renders</th>
+                  <th className="num">{fromUsage ? "Requests" : "Renders"}</th>
                   <th className="num">Tokens</th>
                   <th className="num">Spent</th>
                   <th className="num">Share</th>
@@ -468,7 +480,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
           </div>
         ) : (
           <p className="st-empty">
-            {noKeys ? (isAdmin ? <>Add a BytePlus key in <Link href="/studio/settings">Settings</Link> and renders will show up here.</> : "Renders will show up here once a BytePlus key is connected.") : "No renders in this period."}
+            {noKeys ? (isAdmin ? <>Add a BytePlus key in <Link href="/studio/settings">Settings</Link> and renders will show up here.</> : "Renders will show up here once a BytePlus key is connected.") : keyMode && spend > 0 ? "BytePlus has the totals for this period, but it only lists individual renders for about 7 days, and the newest can take up to 30 minutes to match." : "No renders in this period."}
           </p>
         )}
         {f.page > 1 || hasMore ? (

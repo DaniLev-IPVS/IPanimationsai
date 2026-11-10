@@ -1,5 +1,6 @@
 import { decryptSecret } from "./auth";
 import { inferenceUsageSince, listApiKeys, sameKey, type AccessKey } from "./byteplus";
+import { pickRenders } from "./claim";
 import { one, q } from "./db";
 
 /**
@@ -76,12 +77,58 @@ export async function importKeyUsage(access?: AccessKey): Promise<{ keys: number
     );
   }
   await priceKeyUsage();
+  await claimRendersFromUsage();
   if (!loaded) await setSetting(HISTORY_FLAG, new Date().toISOString());
   await q(
     `insert into studio.settings (key, value) values ('usage_synced_at', now()::text)
      on conflict (key) do update set value = excluded.value`,
   );
   return { keys: keys.length, rows: withKey.length };
+}
+
+const EDGE_MS = 5 * 60000;
+const HOUR_MS = 3600000;
+
+/**
+ * The render list doesn't say which key made a render, so it's worked out from
+ * each producer key's hourly usage (see pickRenders). A ComfyUI run is stronger
+ * evidence, so those renders are left alone. Hours that don't add up to exactly
+ * one set stay with the admin; the key's Spent total is right either way.
+ */
+export async function claimRendersFromUsage() {
+  const usage = await q<{ at: string; model: string; total_tokens: string; requests: number; owner: string }>(
+    `select k.at, k.model, k.total_tokens, k.requests, b.owner_id as owner
+       from studio.key_usage_hourly k
+       join studio.bp_keys b on b.id = k.bp_key_id
+       join studio.users u on u.id = b.owner_id
+      where u.role <> 'admin' and k.total_tokens > 0 and k.at >= now() - interval '8 days'
+      order by k.at`,
+  );
+  if (!usage.length) return;
+  const [renders, admins] = await Promise.all([
+    q<{ id: string; model: string; total_tokens: string; user_id: string; updated_at: string }>(
+      `select id, model, total_tokens, user_id, updated_at from studio.renders
+        where status = 'succeeded' and total_tokens > 0 and comfy_prompt_id is null and updated_at >= now() - interval '9 days'`,
+    ),
+    q<{ id: string }>(`select id from studio.users where role = 'admin'`),
+  ]);
+  const adminIds = new Set(admins.map((a) => a.id));
+  const used = new Set<string>();
+  for (const u of usage) {
+    const from = Date.parse(u.at) - EDGE_MS;
+    const to = Date.parse(u.at) + HOUR_MS + EDGE_MS;
+    const candidates = renders
+      .filter((r) => {
+        const finished = Date.parse(r.updated_at);
+        const sameModelName = r.model === u.model || new RegExp(`^${u.model}-[0-9]{6}$`).test(r.model);
+        return !used.has(r.id) && sameModelName && finished >= from && finished < to && (r.user_id === u.owner || adminIds.has(r.user_id));
+      })
+      .map((r) => ({ id: r.id, tokens: Number(r.total_tokens), mine: r.user_id === u.owner, finished: Date.parse(r.updated_at) }));
+    const ids = pickRenders(candidates, u.requests, Number(u.total_tokens));
+    if (!ids) continue;
+    ids.forEach((id) => used.add(id));
+    await q(`update studio.renders set user_id = $1 where id = any($2::text[]) and user_id <> $1`, [u.owner, ids]);
+  }
 }
 
 /** "dreamina-seedance-2-5" in usage is "dreamina-seedance-2-5-260628" in renders and prices. */
