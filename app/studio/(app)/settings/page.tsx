@@ -187,7 +187,7 @@ export default async function Settings({ searchParams }: { searchParams: { e?: s
       `select b.id::text, b.name, b.masked_key, b.last_access, b.owner_id,
               coalesce(sum(k.cost_usd), 0) as spend, coalesce(sum(k.requests), 0)::int as requests
          from studio.bp_keys b
-         left join studio.key_usage k on k.bp_key_id = b.id and k.day >= current_date - 30
+         left join studio.key_usage_hourly k on k.bp_key_id = b.id and k.at >= now() - interval '30 days'
         group by b.id order by b.name`,
     ),
   ]);

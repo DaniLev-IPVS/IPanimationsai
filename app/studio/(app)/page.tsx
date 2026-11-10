@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/studio/auth";
 import { getTimezone, one, q } from "@/lib/studio/db";
-import { addDays, num, parseFilters, toQuery, usd, whereOf, type Filters, type Group, type Range } from "@/lib/studio/filters";
+import { addDays, LAST_24H, num, parseFilters, toQuery, usd, whereOf, type Filters, type Group, type Range } from "@/lib/studio/filters";
 import { assignRender, bulkAssign, setRenderPerson, syncNow } from "../actions";
 import { AutoSelect, SubmitButton } from "../ui";
 
@@ -10,6 +10,7 @@ const PAGE = 50;
 type Option = { id: string; name: string; status: string; videos: { id: string; name: string }[] };
 
 const RANGES: [Range, string][] = [
+  ["24h", "24 hours"],
   ["7d", "7 days"],
   ["30d", "30 days"],
   ["month", "This month"],
@@ -35,6 +36,20 @@ const dayLabel = (d: string, withYear = false) =>
   new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: withYear ? "numeric" : undefined, timeZone: "UTC" });
 
 const shortModel = (m: string) => m.replace(/^dreamina-/, "").replace(/-\d{6}$/, "");
+
+const HOUR_MS = 3600000;
+
+/** One bar of the 24-hour chart: its key in the database's format, and "7 PM". */
+function hourPoint(ms: number, tz: string) {
+  const part: Record<string, string> = {};
+  new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" })
+    .formatToParts(new Date(ms))
+    .forEach((p) => (part[p.type] = p.value));
+  return {
+    bucket: `${part.year}-${part.month}-${part.day} ${part.hour}`,
+    label: new Date(ms).toLocaleTimeString("en-US", { timeZone: tz, hour: "numeric" }),
+  };
+}
 
 /** Whole-number axis top: 1, 2 or 5 times a power of ten. */
 function niceMax(v: number) {
@@ -111,23 +126,26 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
   const usageOn = Boolean(await one(`select 1 from studio.settings where key = 'byteplus_access'`));
   const keyMode = usageOn && !f.project && !f.unassigned;
   const keyOwner = isAdmin ? f.person : user.id;
-  const kParams: unknown[] = [f.from, f.to];
-  let kWhere = `k.day between $1::date and $2::date`;
+  const is24h = f.range === "24h";
+  const kParams: unknown[] = [f.from, f.to, tz];
+  let kWhere = `k.at >= ($1::date::timestamp at time zone $3::text) and k.at < (($2::date + 1)::timestamp at time zone $3::text)`;
+  if (is24h) kWhere += ` and k.at >= ${LAST_24H}`;
   if (keyOwner) {
     const admin = await one<{ id: string }>(`select id from studio.users where role = 'admin' and active order by created_at limit 1`);
     kParams.push(admin?.id ?? null, keyOwner);
-    kWhere += ` and coalesce(b.owner_id, $3::uuid) = $4::uuid`;
+    kWhere += ` and coalesce(b.owner_id, $4::uuid) = $5::uuid`;
   }
-  const kFrom = `studio.key_usage k left join studio.bp_keys b on b.id = k.bp_key_id`;
+  const kFrom = `studio.key_usage_hourly k left join studio.bp_keys b on b.id = k.bp_key_id`;
 
   const firstRender = f.range === "all"
     ? keyMode
-      ? (await q<{ d: string | null }>(`select to_char(min(k.day), 'YYYY-MM-DD') as d from ${kFrom} where ${kWhere}`, kParams))[0]?.d
+      ? (await q<{ d: string | null }>(`select to_char(min(k.at) at time zone $3::text, 'YYYY-MM-DD') as d from ${kFrom} where ${kWhere}`, kParams))[0]?.d
       : (await q<{ d: string | null }>(`select to_char(min(r.created_at) at time zone $2::text, 'YYYY-MM-DD') as d from studio.renders r where ${where}`, params))[0]?.d
     : null;
   const chartFrom = firstRender || f.from;
   const chartDays = Math.round((Date.parse(f.to) - Date.parse(chartFrom)) / 86400000) + 1;
   const monthly = chartDays > 62;
+  const bucketFormat = is24h ? "YYYY-MM-DD HH24" : monthly ? "YYYY-MM" : "YYYY-MM-DD";
 
   const [totals, series, breakdown, renders, projectRows, videoRows, people, keys] = await Promise.all([
     q<{ spend: string; done: number; failed: number; unassigned: number; unassigned_spend: string; unpriced: number; tokens: string }>(
@@ -142,7 +160,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
       params,
     ),
     q<{ bucket: string; spend: string; n: number }>(
-      `select to_char(r.created_at at time zone $2::text, '${monthly ? "YYYY-MM" : "YYYY-MM-DD"}') as bucket,
+      `select to_char(r.created_at at time zone $2::text, '${bucketFormat}') as bucket,
               coalesce(sum(r.cost_usd), 0) as spend, count(*)::int as n
          from studio.renders r where ${where} and r.status = 'succeeded' group by 1 order by 1`,
       params,
@@ -182,7 +200,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
           kParams,
         ),
         q<{ bucket: string; spend: string; n: number }>(
-          `select to_char(k.day, '${monthly ? "YYYY-MM" : "YYYY-MM-DD"}') as bucket, coalesce(sum(k.cost_usd), 0) as spend, coalesce(sum(k.requests), 0)::int as n
+          `select to_char(k.at at time zone $3::text, '${bucketFormat}') as bucket, coalesce(sum(k.cost_usd), 0) as spend, coalesce(sum(k.requests), 0)::int as n
              from ${kFrom} where ${kWhere} group by 1 order by 1`,
           kParams,
         ),
@@ -210,7 +228,14 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
   const bySeries: Record<string, { spend: number; n: number }> = {};
   (keyMode ? keySeries : series).forEach((s) => (bySeries[s.bucket] = { spend: Number(s.spend), n: s.n }));
   const points: { key: string; label: string; spend: number; n: number; day?: string }[] = [];
-  if (monthly) {
+  if (is24h) {
+    const thisHour = Math.floor(Date.now() / HOUR_MS) * HOUR_MS;
+    for (let i = 23; i >= 0; i--) {
+      const ms = thisHour - i * HOUR_MS;
+      const { bucket, label } = hourPoint(ms, tz);
+      points.push({ key: String(ms), label, spend: bySeries[bucket]?.spend || 0, n: bySeries[bucket]?.n || 0 });
+    }
+  } else if (monthly) {
     let cursor = `${chartFrom.slice(0, 7)}-01`;
     while (cursor <= f.to) {
       const k = cursor.slice(0, 7);
@@ -235,7 +260,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
     ? new Date(keys[0].last_sync_at).toLocaleString("en-US", { timeZone: tz, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
     : null;
   const noKeys = !keys[0]?.n;
-  const rangeTitle = f.range === "all" ? "All time" : f.from === f.to ? dayLabel(f.from, true) : `${dayLabel(f.from)} to ${dayLabel(f.to, true)}`;
+  const rangeTitle = is24h ? "Last 24 hours" : f.range === "all" ? "All time" : f.from === f.to ? dayLabel(f.from, true) : `${dayLabel(f.from)} to ${dayLabel(f.to, true)}`;
   const groups: [Group, string][] = [
     ["day", "Day"],
     ["project", "Project"],
@@ -456,7 +481,7 @@ export default async function Spend({ searchParams }: { searchParams: Record<str
 
       <p className="st-muted st-small st-foot">
         {keyMode
-          ? "Spent and the chart come from BytePlus's usage per API key, updated hourly. Projects and videos come from ComfyUI runs. "
+          ? "Spent and the chart come from BytePlus's usage per API key. BytePlus reports it 5 to 30 minutes late, and this page refreshes every 15 minutes. Projects and videos come from ComfyUI runs. "
           : "Spend is worked out from each render's BytePlus tokens and the price list in Settings. "}
         Times are {tz}.
       </p>

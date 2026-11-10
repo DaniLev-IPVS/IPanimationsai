@@ -92,6 +92,16 @@ const SCHEMA = [
     cost_usd numeric(12,4),
     primary key (day, auth_token, model)
   )`,
+  `create table if not exists studio.key_usage_hourly (
+    at timestamptz not null,
+    auth_token text not null,
+    model text not null,
+    total_tokens bigint not null default 0,
+    requests int not null default 0,
+    bp_key_id bigint references studio.bp_keys(id) on delete set null,
+    cost_usd numeric(12,4),
+    primary key (at, auth_token, model)
+  )`,
   `create table if not exists studio.api_keys (
     id uuid primary key default gen_random_uuid(),
     label text not null,

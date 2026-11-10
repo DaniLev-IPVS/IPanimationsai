@@ -2,7 +2,10 @@ import type { StudioUser } from "./auth";
 import { isUuid } from "./db";
 
 export type Group = "day" | "project" | "video" | "model" | "person" | "key";
-export type Range = "7d" | "30d" | "month" | "lastmonth" | "all" | "custom";
+export type Range = "24h" | "7d" | "30d" | "month" | "lastmonth" | "all" | "custom";
+
+/** The rolling 24-hour view: this hour and the 23 before it. */
+export const LAST_24H = `date_trunc('hour', now()) - interval '23 hours'`;
 
 export type Filters = {
   range: Range;
@@ -19,7 +22,7 @@ export type Filters = {
 type Params = Record<string, string | string[] | undefined>;
 
 const GROUPS: Group[] = ["day", "project", "video", "model", "person", "key"];
-const RANGES: Range[] = ["7d", "30d", "month", "lastmonth", "all", "custom"];
+const RANGES: Range[] = ["24h", "7d", "30d", "month", "lastmonth", "all", "custom"];
 const isDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** Today as YYYY-MM-DD in the studio's time zone. */
@@ -40,7 +43,8 @@ export function parseFilters(sp: Params, tz: string, user: StudioUser): Filters 
   let to = get("to");
   if (isDate(from) && isDate(to) && !get("range")) range = "custom";
 
-  if (range === "7d") [from, to] = [addDays(now, -6), now];
+  if (range === "24h") [from, to] = [addDays(now, -1), now];
+  else if (range === "7d") [from, to] = [addDays(now, -6), now];
   else if (range === "30d") [from, to] = [addDays(now, -29), now];
   else if (range === "month") [from, to] = [`${now.slice(0, 7)}-01`, now];
   else if (range === "lastmonth") {
@@ -77,6 +81,7 @@ export function whereOf(f: Filters, user: StudioUser, opts: { skipProject?: bool
     `r.created_at >= ($1::date::timestamp at time zone $2::text)`,
     `r.created_at < (($3::date + 1)::timestamp at time zone $2::text)`,
   ];
+  if (f.range === "24h") c.push(`r.created_at >= ${LAST_24H}`);
   const owner = user.role === "admin" ? f.person : user.id;
   if (owner) {
     params.push(owner);

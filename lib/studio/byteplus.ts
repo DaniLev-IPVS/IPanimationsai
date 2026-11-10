@@ -80,9 +80,12 @@ export async function listApiKeys(key: AccessKey): Promise<ApiKeyItem[]> {
   return out;
 }
 
-export type UsageRow = { day: string; authToken: string; model: string; totalTokens: number; requests: number };
+export type UsageRow = { at: string; authToken: string; model: string; totalTokens: number; requests: number };
 
-/** Tokens and requests per day, per API key, per model. Same query as `arkcli usage stats --by apikey,model`. */
+/**
+ * Tokens and requests per hour, per API key, per model. BytePlus's Day and Hour
+ * are Singapore time; `at` is the real moment that hour began.
+ */
 export async function inferenceUsage(key: AccessKey, start: string, end: string): Promise<UsageRow[]> {
   const result = await arkAction<{ Fields?: { Name: string }[]; Data?: unknown[][] }>(
     "GetInferenceUsage",
@@ -90,7 +93,7 @@ export async function inferenceUsage(key: AccessKey, start: string, end: string)
       StartTime: start,
       EndTime: end,
       ProjectName: "default",
-      QueryInterval: "Day",
+      QueryInterval: "Hour",
       Filters: [
         { Key: "ModelName", Values: [] },
         { Key: "ModelUnitID", Values: [] },
@@ -103,7 +106,7 @@ export async function inferenceUsage(key: AccessKey, start: string, end: string)
   const names = (result.Fields || []).map((f) => f.Name);
   const at = (row: unknown[], name: string) => row[names.indexOf(name)];
   return (result.Data || []).map((row) => ({
-    day: String(at(row, "Day")),
+    at: new Date(`${at(row, "Day")}T${String(at(row, "Hour")).padStart(2, "0")}:00:00+08:00`).toISOString(),
     authToken: String(at(row, "AuthToken") || ""),
     model: String(at(row, "ModelName") || ""),
     totalTokens: Number(at(row, "TotalTokens") || 0),
@@ -111,22 +114,24 @@ export async function inferenceUsage(key: AccessKey, start: string, end: string)
   }));
 }
 
-const WINDOW_DAYS = 30;
+const WINDOW_DAYS = 5;
 const DAY_MS = 86400000;
+const SINGAPORE_MS = 8 * 3600000;
 const ymd = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /**
- * BytePlus rejects a usage query of 31 days or more, so longer spans go out in
- * 30-day pieces. Rows that differ only by a dimension we don't keep (billing
- * status, model unit) are added together: one row per day, key and model.
+ * BytePlus only answers hourly usage a few days at a time, so longer spans go
+ * out in 5-day pieces, counted from today in Singapore (its calendar). Rows
+ * that differ only by a dimension we don't keep (billing status, model unit)
+ * are added together: one row per hour, key and model.
  */
 export async function inferenceUsageSince(key: AccessKey, daysBack: number, now = Date.now()): Promise<UsageRow[]> {
   const merged = new Map<string, UsageRow>();
   for (let back = 0; back < daysBack; back += WINDOW_DAYS) {
-    const end = now - back * DAY_MS;
+    const end = now + SINGAPORE_MS - back * DAY_MS;
     const start = end - (Math.min(WINDOW_DAYS, daysBack - back) - 1) * DAY_MS;
     for (const row of await inferenceUsage(key, ymd(start), ymd(end))) {
-      const id = `${row.day}|${row.authToken}|${row.model}`;
+      const id = `${row.at}|${row.authToken}|${row.model}`;
       const seen = merged.get(id);
       if (seen) {
         seen.totalTokens += row.totalTokens;
