@@ -3,7 +3,7 @@ import { brand } from "@/content/site";
 import { hashedUser, postCapi, type CapiEvent, type MetaMatch } from "@/lib/capi";
 
 /**
- * Notion → Meta: every lead Daniel moves to Pitch booked or any later stage of
+ * Notion → Meta: every lead Daniel moves to Pitch Booked or any later stage of
  * a live deal goes back to the dataset as a QualifiedLead, once. That is the
  * event the ad sets can learn from instead of "filled in a form".
  *
@@ -15,17 +15,23 @@ import { hashedUser, postCapi, type CapiEvent, type MetaMatch } from "@/lib/capi
  * with), CRON_SECRET, META_CAPI_TOKEN. Needs in Notion: a "Sent to Meta"
  * checkbox (ticked here, so each lead is sent once) and, optionally, a
  * "Meta match" text column filled by the Zap from the lead's meta_match field.
+ *
+ * Each run reads the Lead DB's columns first. A missing "Sent to Meta" column
+ * stops the run with a message that says so, and the statuses below are matched
+ * to Notion's own spelling, so recapitalising one in Notion doesn't break this.
  */
 
 export const runtime = "nodejs";
 
 const LEADS = "3f363a9c-0965-80a7-a506-000b8722a3cb"; // IP Animations Lead DB data source
+const NOTION_API = process.env.NOTION_API_URL || "https://api.notion.com/v1";
 const NOTION_VERSION = "2025-09-03";
+const SENT = "Sent to Meta";
 
 // A booked pitch and everything after it in a deal that's still alive or won.
-// Not qualified, Dibil, Reach out list and Low price Leads never count.
+// Not qualified, Dibil, Reach out list and Low Price Lead never count.
 const QUALIFIED = [
-  "Pitch booked",
+  "Pitch Booked",
   "Create Estimate",
   "Estimate Follow-up 1",
   "Estimate Follow-up 2",
@@ -51,8 +57,9 @@ export async function GET(req: Request) {
   const dry = new URL(req.url).searchParams.has("dry");
 
   let pages: NotionPage[];
+  let missingStatuses: string[];
   try {
-    pages = await unsentQualified(token);
+    ({ pages, missingStatuses } = await unsentQualified(token));
   } catch (err) {
     console.error("[qualified-leads] Notion query failed:", err);
     return NextResponse.json({ error: String(err) }, { status: 502 });
@@ -63,6 +70,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       dry,
       count: leads.length,
+      missingStatuses,
       leads: leads.map(({ name, status, event }) => ({
         name,
         status,
@@ -80,29 +88,53 @@ export async function GET(req: Request) {
   const ticked = await Promise.all(leads.map((l) => tick(token, l.id)));
   const failed = leads.filter((_, i) => !ticked[i]).map((l) => l.name);
   if (failed.length) console.error("[qualified-leads] sent but not ticked:", failed);
-  return NextResponse.json({ sent: leads.map((l) => l.name), untickedInNotion: failed });
+  console.log(`[qualified-leads] sent ${leads.length} to Meta, ${failed.length} not ticked`);
+  return NextResponse.json({ sent: leads.map((l) => l.name), untickedInNotion: failed, missingStatuses });
 }
 
-async function notion(token: string, path: string, method: string, body: unknown) {
-  const res = await fetch(`https://api.notion.com/v1/${path}`, {
+async function notion(token: string, path: string, method: string, body?: unknown) {
+  const res = await fetch(`${NOTION_API}/${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
       "Notion-Version": NOTION_VERSION,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
+    ...(body !== undefined && { body: JSON.stringify(body) }),
     signal: AbortSignal.timeout(10000),
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(`Notion ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * The qualified statuses as Notion spells them today, plus the ones on our list
+ * that Notion no longer has (renamed to something else, or deleted).
+ */
+async function liveStatuses(token: string) {
+  const { properties = {} } = await notion(token, `data_sources/${LEADS}`, "GET");
+  if (properties[SENT]?.type !== "checkbox") {
+    throw new Error(`The Lead DB has no "${SENT}" checkbox column. Add it in Notion; nothing was sent.`);
+  }
+  const options: string[] = (properties.Status?.status?.options ?? []).map((o: any) => o.name);
+  const names = options.filter((o) => QUALIFIED.some((q) => sameName(q, o)));
+  const missingStatuses = QUALIFIED.filter((q) => !options.some((o) => sameName(q, o)));
+  if (missingStatuses.length) {
+    console.warn("[qualified-leads] statuses not in the Lead DB, leads there are skipped:", missingStatuses);
+  }
+  if (!names.length) throw new Error("None of the qualified statuses exist in the Lead DB. Nothing was sent.");
+  return { names, missingStatuses };
+}
+
 async function unsentQualified(token: string) {
+  const { names, missingStatuses } = await liveStatuses(token);
   const filter = {
     and: [
-      { property: "Sent to Meta", checkbox: { equals: false } },
-      { or: QUALIFIED.map((name) => ({ property: "Status", status: { equals: name } })) },
+      { property: SENT, checkbox: { equals: false } },
+      { or: names.map((name) => ({ property: "Status", status: { equals: name } })) },
     ],
   };
   const pages: NotionPage[] = [];
@@ -116,13 +148,13 @@ async function unsentQualified(token: string) {
     pages.push(...res.results);
     cursor = res.has_more ? res.next_cursor : undefined;
   } while (cursor && pages.length < 500);
-  return pages;
+  return { pages, missingStatuses };
 }
 
 async function tick(token: string, pageId: string) {
   try {
     await notion(token, `pages/${pageId}`, "PATCH", {
-      properties: { "Sent to Meta": { checkbox: true } },
+      properties: { [SENT]: { checkbox: true } },
     });
     return true;
   } catch (err) {
