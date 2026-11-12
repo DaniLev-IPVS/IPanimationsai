@@ -12,6 +12,7 @@ export function NavLinks() {
   const items = [
     { href: "/studio", label: "Spend", on: path === "/studio" },
     { href: "/studio/projects", label: "Projects", on: path.startsWith("/studio/projects") },
+    { href: "/studio/clients", label: "Potential clients", on: path.startsWith("/studio/clients") },
     { href: "/studio/settings", label: "Settings", on: path.startsWith("/studio/settings") },
   ];
   return (

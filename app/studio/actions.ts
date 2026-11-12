@@ -15,6 +15,7 @@ import {
 } from "@/lib/studio/auth";
 import { getTimezone, isUuid, one, q } from "@/lib/studio/db";
 import { parseFilters, whereOf } from "@/lib/studio/filters";
+import { sendEstimate } from "@/lib/studio/proposals";
 import { fetchTaskPage, matchComfy, repriceUnpriced, syncAll } from "@/lib/studio/sync";
 import { importKeyUsage, priceKeyUsage } from "@/lib/studio/usage";
 
@@ -184,6 +185,35 @@ export async function setVideoStatus(fd: FormData) {
   if (!isUuid(id) || ["in_production", "delivered"].indexOf(status) < 0) return;
   await q(`update studio.videos set status = $2 where id = $1`, [id, status]);
   done();
+}
+
+// ── Potential clients: the team's cost estimate goes back to Notion ────────
+
+export async function sendCostEstimate(fd: FormData) {
+  const user = await requireUser();
+  const project = text(fd, "project");
+  if (!isUuid(project)) fail("/studio/clients", "That project wasn't found.");
+
+  const costs: Record<string, number> = {};
+  for (const [key, value] of Array.from(fd.entries())) {
+    if (!key.startsWith("cost:") || String(value).trim() === "") continue;
+    const id = key.slice(5);
+    const cost = Number(value);
+    if (!isUuid(id) || !Number.isFinite(cost) || cost < 0 || cost > 10_000_000) {
+      fail("/studio/clients", "One of the costs isn't a number.");
+    }
+    costs[id] = Math.round(cost * 100) / 100;
+  }
+
+  let name = "";
+  try {
+    name = await sendEstimate(user, project, costs, text(fd, "notes").slice(0, 4000));
+  } catch (err) {
+    console.error("[studio/clients] estimate not sent:", err);
+    fail("/studio/clients", err instanceof Error ? err.message : "Notion didn't accept the estimate. Try again.");
+  }
+  done();
+  redirect(`/studio/clients?sent=${encodeURIComponent(name)}`);
 }
 
 // ── Usage by API key (admin) ───────────────────────────────────────────────

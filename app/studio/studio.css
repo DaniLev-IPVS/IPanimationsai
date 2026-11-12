@@ -57,8 +57,8 @@
   font-size: 20px;
 }
 .st a.st-brand:hover { text-decoration: none; }
-.st-nav { display: flex; gap: 4px; }
-.st .st-nav a { color: var(--paper-soft); padding: 6px 12px; border-radius: 8px; font-weight: 600; }
+.st-nav { display: flex; flex-wrap: wrap; gap: 4px; }
+.st .st-nav a { color: var(--paper-soft); padding: 6px 12px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
 .st .st-nav a:hover { color: #fff; text-decoration: none; }
 .st .st-nav a[aria-current="page"] { background: var(--charcoal-2); color: #fff; }
 .st-who { margin-left: auto; display: flex; align-items: center; gap: 14px; }
@@ -75,7 +75,8 @@
 
 /* Controls */
 .st input,
-.st select {
+.st select,
+.st textarea {
   font: inherit;
   color: var(--ink);
   background: #fff;
@@ -239,6 +240,28 @@
 .st-chip { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--line-light); color: var(--ink-soft); }
 .st-chip-active { background: #d9f6ef; color: #0b6b58; }
 
+/* Potential clients */
+.st textarea { width: 100%; min-height: 84px; resize: vertical; line-height: 1.5; }
+.st-client-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.st-brief { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.st-brief > div { display: grid; gap: 2px; }
+.st-brief dt { font-size: 12px; font-weight: 700; color: var(--st-muted); }
+.st-brief dd { margin: 0; max-width: 75ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.st-brief-notes { display: grid; gap: 6px; max-width: 75ch; }
+.st-brief-notes p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.st-estimate { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding-top: 14px; border-top: 1px solid var(--line-light); }
+.st-ideas { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.st-idea { padding: 14px; display: grid; gap: 10px; background: #fff; border: 1px solid var(--line-light); border-radius: 10px; }
+.st-idea-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.st .st-idea-head h3.st-subhead { margin: 0; }
+.st-idea-cost { margin-left: auto; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.st-idea-estimate { justify-self: start; }
+.st-idea-estimate input { width: 180px; }
+.st-estimate-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.st-chip-low { background: #d9f6ef; color: #0b6b58; }
+.st-chip-mid { background: #fff3cf; color: #7a5600; }
+.st-chip-high { background: #fdeeec; color: #b3261e; }
+
 /* Forms */
 .st-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; background: var(--paper); border-radius: 10px; font-size: 14px; font-weight: 600; }
 .st-form-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
@@ -273,4 +296,7 @@
   .st-form-row input, .st-form-row select { width: 100%; }
   .st-chart { padding-left: 44px; }
   .st-reveal input { width: 100%; }
+  .st-idea-cost { margin-left: 0; flex-basis: 100%; }
+  .st-idea-estimate { justify-self: stretch; }
+  .st-idea-estimate input { width: 100%; }
 }
