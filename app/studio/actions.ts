@@ -15,7 +15,7 @@ import {
 } from "@/lib/studio/auth";
 import { getTimezone, isUuid, one, q } from "@/lib/studio/db";
 import { parseFilters, whereOf } from "@/lib/studio/filters";
-import { addIdea, sendEstimate } from "@/lib/studio/proposals";
+import { addIdea, submitEstimate, type Estimate, type Submitted } from "@/lib/studio/proposals";
 import { fetchTaskPage, matchComfy, repriceUnpriced, syncAll } from "@/lib/studio/sync";
 import { importKeyUsage, priceKeyUsage } from "@/lib/studio/usage";
 
@@ -187,58 +187,75 @@ export async function setVideoStatus(fd: FormData) {
   done();
 }
 
-// ── Potential clients: the team's cost estimate goes back to Notion ────────
+// ── Potential clients: the team's estimates go back to Notion ──────────────
 
-export async function sendCostEstimate(fd: FormData) {
+const CLIENTS = "/studio/clients";
+
+/** Back to the project that was being worked on, with its dropdown still open. */
+const clientsError = (project: string, message: string): never =>
+  redirect(`${CLIENTS}?${new URLSearchParams({ ...(isUuid(project) && { open: project }), e: message })}`);
+
+/** The cost range and the days from a form, or the reason they can't be used. */
+function estimateOf(fd: FormData): Estimate | string {
+  const num = (k: string) => (text(fd, k) === "" ? NaN : Number(text(fd, k)));
+  const [low, high, days] = [num("low"), num("high"), num("days")];
+  if (![low, high, days].every(Number.isFinite)) return "Fill in both ends of the cost range and the days.";
+  if (low < 0 || high > 10_000_000 || high < low) return "The cost range has to go from the lower number to the higher one.";
+  if (days <= 0 || days > 3650) return "The days have to be more than zero.";
+  const cents = (n: number) => Math.round(n * 100) / 100;
+  return { low: cents(low), high: cents(high), days: Math.round(days * 2) / 2 };
+}
+
+function clientsDone(project: string, result: Submitted): never {
+  done();
+  const query = new URLSearchParams(
+    result.complete ? { sent: result.project } : { open: project, saved: result.idea },
+  );
+  return redirect(`${CLIENTS}?${query}`);
+}
+
+export async function submitIdeaEstimate(fd: FormData) {
   const user = await requireUser();
   const project = text(fd, "project");
-  if (!isUuid(project)) fail("/studio/clients", "That project wasn't found.");
+  const idea = text(fd, "idea");
+  if (!isUuid(project) || !isUuid(idea)) fail(CLIENTS, "That idea wasn't found.");
+  const estimate = estimateOf(fd);
+  if (typeof estimate === "string") return clientsError(project, estimate);
 
-  const costs: Record<string, number> = {};
-  for (const [key, value] of Array.from(fd.entries())) {
-    if (!key.startsWith("cost:") || String(value).trim() === "") continue;
-    const id = key.slice(5);
-    const cost = Number(value);
-    if (!isUuid(id) || !Number.isFinite(cost) || cost < 0 || cost > 10_000_000) {
-      fail("/studio/clients", "One of the costs isn't a number.");
-    }
-    costs[id] = Math.round(cost * 100) / 100;
-  }
-
-  let name = "";
+  let result: Submitted;
   try {
-    name = await sendEstimate(user, project, costs, text(fd, "notes").slice(0, 4000));
+    result = await submitEstimate(user, project, idea, estimate);
   } catch (err) {
-    console.error("[studio/clients] estimate not sent:", err);
-    fail("/studio/clients", err instanceof Error ? err.message : "Notion didn't accept the estimate. Try again.");
+    console.error("[studio/clients] estimate not saved:", err);
+    return clientsError(project, err instanceof Error ? err.message : "Notion didn't accept the estimate. Try again.");
   }
-  done();
-  redirect(`/studio/clients?sent=${encodeURIComponent(name)}`);
+  clientsDone(project, result);
 }
 
 export async function addTeamIdea(fd: FormData) {
   const user = await requireUser();
   const project = text(fd, "project");
-  if (!isUuid(project)) fail("/studio/clients", "That project wasn't found.");
+  if (!isUuid(project)) fail(CLIENTS, "That project wasn't found.");
   const title = text(fd, "title").slice(0, 120);
   const what = text(fd, "what").slice(0, 6000);
-  if (!title || !what) fail("/studio/clients", "An idea needs a short name and a description.");
+  if (!title || !what) return clientsError(project, "An idea needs a short name and a description.");
 
-  const raw = text(fd, "cost");
-  const cost = raw === "" ? null : Number(raw);
-  if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 10_000_000)) {
-    fail("/studio/clients", "The cost isn't a number.");
+  const rawSeconds = text(fd, "seconds");
+  const seconds = rawSeconds === "" ? null : Number(rawSeconds);
+  if (seconds !== null && (!Number.isFinite(seconds) || seconds <= 0 || seconds > 36000)) {
+    return clientsError(project, "The length in seconds isn't a number.");
   }
+  const estimate = estimateOf(fd);
+  if (typeof estimate === "string") return clientsError(project, estimate);
 
-  let name = "";
+  let result: Submitted;
   try {
-    name = await addIdea(user, project, { title, what, cost: cost === null ? null : Math.round(cost * 100) / 100 });
+    result = await addIdea(user, project, { title, what, seconds, estimate });
   } catch (err) {
     console.error("[studio/clients] idea not added:", err);
-    fail("/studio/clients", err instanceof Error ? err.message : "Notion didn't accept the idea. Try again.");
+    return clientsError(project, err instanceof Error ? err.message : "Notion didn't accept the idea. Try again.");
   }
-  done();
-  redirect(`/studio/clients?added=${encodeURIComponent(name)}`);
+  clientsDone(project, result);
 }
 
 // ── Usage by API key (admin) ───────────────────────────────────────────────

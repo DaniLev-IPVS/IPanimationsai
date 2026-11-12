@@ -1,9 +1,9 @@
 import { requireUser } from "@/lib/studio/auth";
 import { loadBoard } from "@/lib/studio/proposals";
-import { addTeamIdea, sendCostEstimate } from "../../actions";
+import { addTeamIdea, submitIdeaEstimate } from "../../actions";
 import { ClientsView } from "./view";
 
-export default async function Clients({ searchParams }: { searchParams: { e?: string; sent?: string; added?: string } }) {
+export default async function Clients({ searchParams }: { searchParams: { e?: string; sent?: string; saved?: string; open?: string } }) {
   const user = await requireUser();
   const isAdmin = user.role === "admin";
 
@@ -23,8 +23,9 @@ export default async function Clients({ searchParams }: { searchParams: { e?: st
       problem={problem}
       error={searchParams.e}
       sent={searchParams.sent}
-      added={searchParams.added}
-      action={sendCostEstimate}
+      saved={searchParams.saved}
+      open={searchParams.open}
+      estimateAction={submitIdeaEstimate}
       addAction={addTeamIdea}
     />
   );

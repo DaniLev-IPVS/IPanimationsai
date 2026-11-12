@@ -7,8 +7,9 @@ import type { StudioUser } from "./auth";
  * Estimate") becomes a Project
  * row (the intake cron does that). Daniel adds Idea rows under it, then sets the project to
  * "Team check / Estimate" and picks who it's for in "Assigned to". That is what
- * puts it on /studio/clients. Sending the cost estimate from there writes the
- * numbers back and moves the project to "Internal check / Create proposal".
+ * puts it on /studio/clients. The team gives each idea a cost range and the
+ * days it takes; when every idea has one, the project moves to "Internal
+ * check / Create proposal" by itself.
  *
  * Needs NOTION_TOKEN: the same internal integration the Lead DB is shared
  * with, also connected to the Proposal Board (••• → Connections in Notion).
@@ -37,8 +38,19 @@ export type Idea = {
   impact: string;
   cost: number | null;
   tier: string;
-  teamCost: number | null;
+  seconds: number | null;
+  /** The team's estimate: what it costs to make, as a range, and how long it takes. */
+  teamLow: number | null;
+  teamHigh: number | null;
+  teamDays: number | null;
+  /** The body of the idea's Notion page (a script, usually), as plain lines. */
+  details: string[];
 };
+
+export type Estimate = { low: number; high: number; days: number };
+
+export const isEstimated = (idea: Pick<Idea, "teamLow" | "teamHigh" | "teamDays">) =>
+  idea.teamLow !== null && idea.teamHigh !== null && idea.teamDays !== null;
 
 export type Project = {
   id: string;
@@ -46,6 +58,7 @@ export type Project = {
   name: string;
   status: string;
   assignedTo: string[];
+  who: string;
   needs: string;
   why: string;
   usedFor: string;
@@ -122,6 +135,7 @@ function projectOf(page: NotionPage): Project {
     name: plain(p.Name) || "Untitled project",
     status: p.Status?.status?.name ?? "",
     assignedTo: (p["Assigned to"]?.multi_select ?? []).map((o: any) => String(o.name)),
+    who: plain(p["Who the client is"]),
     needs: plain(p["Client needs"]),
     why: plain(p["Why they need it"]),
     usedFor: plain(p["What it is for"]),
@@ -147,7 +161,11 @@ function ideaOf(page: NotionPage): Idea {
     impact: plain(p["Potential impact"]),
     cost: numberOf(p.Cost),
     tier: p["Cost tier"]?.select?.name ?? "",
-    teamCost: numberOf(p["Team cost estimate"]),
+    seconds: numberOf(p.Seconds),
+    teamLow: numberOf(p["Team cost low"]),
+    teamHigh: numberOf(p["Team cost high"]),
+    teamDays: numberOf(p["Team days"]),
+    details: [],
   };
 }
 
@@ -177,9 +195,9 @@ async function ideasFor(projectIds: string[]): Promise<Map<string, Idea[]>> {
       if (key) byProject.get(key)!.push(ideaOf(page));
     }
   }
-  // Cheapest first, so the low, mid and high options read in order.
+  // Idea 1, Idea 2, … Idea 10, in the order they are numbered.
   byProject.forEach((list) => {
-    list.sort((a, b) => (a.cost ?? Infinity) - (b.cost ?? Infinity) || a.name.localeCompare(b.name));
+    list.sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }));
   });
   return byProject;
 }
@@ -189,7 +207,7 @@ const TEXT_BLOCKS = [
   "numbered_list_item", "to_do", "quote", "callout", "toggle",
 ];
 
-/** Whatever Daniel typed in the body of the Notion page, as plain lines. */
+/** Whatever is typed in the body of a Notion page (project or idea), as plain lines. */
 async function pageNotes(pageId: string): Promise<string[]> {
   try {
     const res = await notion(`blocks/${pageId}/children?page_size=100`, "GET");
@@ -205,7 +223,7 @@ async function pageNotes(pageId: string): Promise<string[]> {
   }
 }
 
-/** Projects waiting for this person's cost estimate, and the ones already sent back. */
+/** Projects waiting for this person's estimates, and the ones already estimated. */
 export async function loadBoard(user: StudioUser): Promise<{ waiting: Project[]; sent: Project[] }> {
   const pages = await queryAll(
     BOARD,
@@ -230,17 +248,26 @@ export async function loadBoard(user: StudioUser): Promise<{ waiting: Project[];
     .slice(0, 10);
 
   const [ideas, notes] = await Promise.all([
-    ideasFor(waiting.map((p) => p.id)),
+    ideasFor([...waiting, ...sent].map((p) => p.id)),
     Promise.all(waiting.map((p) => pageNotes(p.id))),
   ]);
   waiting.forEach((p, i) => {
     p.ideas = ideas.get(p.id) ?? [];
     p.notes = notes[i];
   });
+  sent.forEach((p) => {
+    p.ideas = ideas.get(p.id) ?? [];
+  });
+  // Each idea's own page holds its script; only the open projects need it.
+  const open = waiting.flatMap((p) => p.ideas);
+  const details = await Promise.all(open.map((idea) => pageNotes(idea.id)));
+  open.forEach((idea, i) => {
+    idea.details = details[i];
+  });
   return { waiting, sent };
 }
 
-// ── The team's side: add an idea, send the cost estimate ───────────────────
+// ── The team's side: estimate each idea, add one of their own ──────────────
 
 /** The project, once it's certain this person may write to it right now. */
 async function waitingProject(user: StudioUser, projectId: string): Promise<Project> {
@@ -251,65 +278,75 @@ async function waitingProject(user: StudioUser, projectId: string): Promise<Proj
   const project = projectOf(page);
   if (!canSee(user, project)) throw new NotionError("That project isn't assigned to you.");
   if (project.status !== STATUS.teamCheck) {
-    throw new NotionError(`${project.name} is no longer waiting for a cost estimate.`);
+    throw new NotionError(`${project.name} is no longer waiting for estimates.`);
   }
   return project;
 }
 
-/**
- * The team's own idea for the video, as a new Idea row under the project:
- * what it is and what it costs to make. The price to the client stays empty
- * for Daniel.
- */
-export async function addIdea(
-  user: StudioUser,
-  projectId: string,
-  idea: { title: string; what: string; cost: number | null },
-): Promise<string> {
-  const project = await waitingProject(user, projectId);
-  const existing = (await ideasFor([project.id])).get(project.id) ?? [];
-  await notion("pages", "POST", {
-    parent: { type: "data_source_id", data_source_id: BOARD },
-    properties: {
-      Name: { title: richText(`Idea ${existing.length + 1} — ${idea.title}`) },
-      Type: { select: { name: "Idea" } },
-      Project: { relation: [{ id: project.id }] },
-      "The idea": { rich_text: richText(idea.what) },
-      ...(idea.cost !== null && { "Team cost estimate": { number: idea.cost } }),
-    },
-  });
-  return project.name;
-}
+const estimateProps = (e: Estimate) => ({
+  "Team cost low": { number: e.low },
+  "Team cost high": { number: e.high },
+  "Team days": { number: e.days },
+});
 
 /**
- * Writes the team's numbers to Notion and hands the project back to Daniel.
- * Everything is checked again here: the page really is a project on the board,
- * it is still waiting for the team, and this person is allowed to see it.
+ * Once every idea on the project has an estimate, the project goes back to
+ * Daniel by itself: that is the whole hand-off, there is no separate button.
  */
-export async function sendEstimate(
-  user: StudioUser,
-  projectId: string,
-  costs: Record<string, number>,
-  notes: string,
-): Promise<string> {
-  const project = await waitingProject(user, projectId);
+async function handBackIfComplete(user: StudioUser, project: Project): Promise<boolean> {
   const ideas = (await ideasFor([project.id])).get(project.id) ?? [];
-  for (const idea of ideas) {
-    const cost = costs[idea.id];
-    if (cost === undefined) continue;
-    await notion(`pages/${idea.id}`, "PATCH", { properties: { "Team cost estimate": { number: cost } } });
-  }
-
-  // The status moves last, so a failed write above leaves the project on the page to try again.
+  if (!ideas.length || !ideas.every(isEstimated)) return false;
   await notion(`pages/${project.id}`, "PATCH", {
     properties: {
       Status: { status: { name: STATUS.proposal } },
-      "Team notes": { rich_text: richText(notes) },
       "Team checked": { date: { start: new Date().toISOString() } },
       "Team checked by": { rich_text: richText(user.name) },
     },
   });
-  return project.name;
+  return true;
+}
+
+export type Submitted = { project: string; idea: string; complete: boolean };
+
+/** One idea's estimate: a cost range and the days it takes. */
+export async function submitEstimate(
+  user: StudioUser,
+  projectId: string,
+  ideaId: string,
+  estimate: Estimate,
+): Promise<Submitted> {
+  const project = await waitingProject(user, projectId);
+  const ideas = (await ideasFor([project.id])).get(project.id) ?? [];
+  const idea = ideas.find((i) => sameId(i.id, ideaId));
+  if (!idea) throw new NotionError("That idea isn't on this project any more.");
+  await notion(`pages/${idea.id}`, "PATCH", { properties: estimateProps(estimate) });
+  return { project: project.name, idea: idea.name, complete: await handBackIfComplete(user, project) };
+}
+
+/**
+ * The team's own idea for the video, as a new Idea row under the project, with
+ * its estimate. The price to the client stays empty for Daniel.
+ */
+export async function addIdea(
+  user: StudioUser,
+  projectId: string,
+  idea: { title: string; what: string; seconds: number | null; estimate: Estimate },
+): Promise<Submitted> {
+  const project = await waitingProject(user, projectId);
+  const existing = (await ideasFor([project.id])).get(project.id) ?? [];
+  const name = `Idea ${existing.length + 1} — ${idea.title}`;
+  await notion("pages", "POST", {
+    parent: { type: "data_source_id", data_source_id: BOARD },
+    properties: {
+      Name: { title: richText(name) },
+      Type: { select: { name: "Idea" } },
+      Project: { relation: [{ id: project.id }] },
+      "The idea": { rich_text: richText(idea.what) },
+      ...(idea.seconds !== null && { Seconds: { number: idea.seconds } }),
+      ...estimateProps(idea.estimate),
+    },
+  });
+  return { project: project.name, idea: name, complete: await handBackIfComplete(user, project) };
 }
 
 // ── Intake: a lead in planning gets its project row ────────────────────────

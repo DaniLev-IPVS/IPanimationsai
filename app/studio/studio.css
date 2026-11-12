@@ -242,25 +242,30 @@
 
 /* Potential clients */
 .st textarea { width: 100%; min-height: 84px; resize: vertical; line-height: 1.5; }
-.st-client-meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .st-brief { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .st-brief > div { display: grid; gap: 2px; }
 .st-brief dt { font-size: 12px; font-weight: 700; color: var(--st-muted); }
 .st-brief dd { margin: 0; max-width: 75ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 .st-brief-notes { display: grid; gap: 6px; max-width: 75ch; }
 .st-brief-notes p { white-space: pre-wrap; overflow-wrap: anywhere; }
-.st-estimate { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding-top: 14px; border-top: 1px solid var(--line-light); }
-.st-ideas { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
-.st-idea { padding: 14px; display: grid; gap: 10px; background: #fff; border: 1px solid var(--line-light); border-radius: 10px; }
-.st-idea-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.st .st-idea-head h3.st-subhead { margin: 0; }
-.st-idea-cost { margin-left: auto; font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.st-idea-estimate { justify-self: start; }
-.st-idea-estimate input { width: 180px; }
-.st-estimate-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.st-add-idea { padding: 12px 14px; background: #fff; border: 1px dashed var(--line-light); border-radius: 10px; }
-.st-add-idea summary { cursor: pointer; font-weight: 700; }
-.st-add-idea form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding-top: 12px; }
+.st-drop { background: #fff; border: 1px solid var(--line-light); border-radius: 10px; min-width: 0; }
+.st-drop > summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 14px; cursor: pointer; list-style: none; font-weight: 700; color: var(--ink); }
+.st-drop > summary::-webkit-details-marker { display: none; }
+.st-drop > summary::before { content: ""; flex: none; width: 7px; height: 7px; border-right: 2px solid var(--st-muted); border-bottom: 2px solid var(--st-muted); transform: rotate(-45deg); transition: transform 0.12s; }
+.st-drop[open] > summary::before { transform: rotate(45deg); }
+.st-drop > summary:focus-visible { outline: 2px solid var(--grape); outline-offset: 2px; border-radius: 10px; }
+.st-drop-title { min-width: 0; overflow-wrap: anywhere; }
+.st-drop-meta { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 400; }
+.st-drop-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 2px 14px 14px; }
+.st-drop-text { margin: 0; max-width: 75ch; white-space: pre-wrap; overflow-wrap: anywhere; }
+.st-drop-client { background: var(--st-card); border-radius: 14px; }
+.st-drop-client > summary { padding: 16px 18px; font-size: 17px; }
+.st-drop-client > .st-drop-body { padding: 2px 18px 18px; }
+.st-drop-quiet { border-style: dashed; }
+.st-estimate-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding-top: 12px; border-top: 1px solid var(--line-light); }
+.st-estimate-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.st-estimate-row label, .st-estimate-seconds { flex: 0 1 190px; max-width: 220px; }
+.st-estimate-row input, .st-estimate-seconds input { width: 100%; }
 .st-chip-low { background: #d9f6ef; color: #0b6b58; }
 .st-chip-mid { background: #fff3cf; color: #7a5600; }
 .st-chip-high { background: #fdeeec; color: #b3261e; }
@@ -299,7 +304,6 @@
   .st-form-row input, .st-form-row select { width: 100%; }
   .st-chart { padding-left: 44px; }
   .st-reveal input { width: 100%; }
-  .st-idea-cost { margin-left: 0; flex-basis: 100%; }
-  .st-idea-estimate { justify-self: stretch; }
-  .st-idea-estimate input { width: 100%; }
+  .st-drop-meta { margin-left: 17px; flex-basis: 100%; }
+  .st-estimate-row label, .st-estimate-seconds { flex: 1 1 100%; max-width: none; }
 }
