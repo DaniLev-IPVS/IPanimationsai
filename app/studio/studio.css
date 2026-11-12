@@ -258,6 +258,9 @@
 .st-idea-estimate { justify-self: start; }
 .st-idea-estimate input { width: 180px; }
 .st-estimate-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.st-add-idea { padding: 12px 14px; background: #fff; border: 1px dashed var(--line-light); border-radius: 10px; }
+.st-add-idea summary { cursor: pointer; font-weight: 700; }
+.st-add-idea form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding-top: 12px; }
 .st-chip-low { background: #d9f6ef; color: #0b6b58; }
 .st-chip-mid { background: #fff3cf; color: #7a5600; }
 .st-chip-high { background: #fdeeec; color: #b3261e; }

@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { createProjectFromLead, leadsWithoutProject, plain } from "@/lib/studio/proposals";
 
 /**
- * Lead DB → Proposal Board: every lead Daniel moves to "Pitch Booked" (or
- * straight to "Create Estimate") gets a project row on the board, once, with
- * what the lead already told us filled in.
+ * Lead DB → Proposal Board: every lead Daniel moves to "Pitch Booked",
+ * "Interested for info" or "Create Estimate" gets a project row on the board,
+ * once, with what the lead already told us filled in.
  * The row's Lead relation is what marks the lead as done (it fills the lead's
  * "Proposal" column), so a lead is never copied twice.
  *

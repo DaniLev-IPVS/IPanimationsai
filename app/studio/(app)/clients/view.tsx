@@ -45,7 +45,7 @@ function Brief({ project }: { project: Project }) {
   );
 }
 
-function IdeaCard({ idea, index }: { idea: Idea; index: number }) {
+function IdeaCard({ idea, index, form }: { idea: Idea; index: number; form: string }) {
   const parts: [string, string][] = [
     ["The idea", idea.idea],
     ["Why this idea", idea.why],
@@ -56,7 +56,9 @@ function IdeaCard({ idea, index }: { idea: Idea; index: number }) {
       <div className="st-idea-head">
         <h3 className="st-subhead">{idea.name || `Idea ${index + 1}`}</h3>
         {idea.tier ? <span className={`st-chip ${TIER_CLASS[idea.tier] ?? ""}`}>{idea.tier}</span> : null}
-        <span className="st-idea-cost">{idea.cost === null ? "No cost yet" : usd(idea.cost)}</span>
+        <span className="st-idea-cost">
+          {idea.cost === null ? <span className="st-muted st-small">No client price yet</span> : usd(idea.cost)}
+        </span>
       </div>
       <dl className="st-brief">
         {parts.filter(([, value]) => value).map(([label, value]) => (
@@ -69,6 +71,7 @@ function IdeaCard({ idea, index }: { idea: Idea; index: number }) {
       <label className="st-idea-estimate">
         Your cost to make it (USD)
         <input
+          form={form}
           name={`cost:${idea.id}`}
           type="number"
           inputMode="decimal"
@@ -88,14 +91,18 @@ export function ClientsView({
   problem,
   error,
   sent,
+  added,
   action,
+  addAction,
 }: {
   isAdmin: boolean;
   board: { waiting: Project[]; sent: Project[] } | null;
   problem: string;
   error?: string;
   sent?: string;
+  added?: string;
   action: (fd: FormData) => Promise<void>;
+  addAction: (fd: FormData) => Promise<void>;
 }) {
   return (
     <>
@@ -105,7 +112,7 @@ export function ClientsView({
           <p className="st-muted">
             {isAdmin
               ? "Every project set to Team check / Estimate in Notion, whoever it's assigned to."
-              : "Projects Daniel sent you to price. Read the ideas, add what each would cost to make, and send it back."}
+              : "Projects Daniel sent you. Read what the client wants, add your idea for the video and what it costs to make, and send it back."}
           </p>
         </div>
       </div>
@@ -114,6 +121,7 @@ export function ClientsView({
       {sent ? (
         <p className="st-note" role="status">Cost estimate sent for {sent}. Daniel can build the proposal now.</p>
       ) : null}
+      {added ? <p className="st-note" role="status">Idea added to {added}.</p> : null}
       {problem ? (
         <p className="st-error" role="alert">
           Couldn&apos;t read the proposal board from Notion.{isAdmin ? ` ${problem}` : " Tell Daniel."}
@@ -141,15 +149,50 @@ export function ClientsView({
           </div>
           <Brief project={project} />
 
-          <form action={action} className="st-estimate">
-            <input type="hidden" name="project" value={project.id} />
+          <div className="st-estimate">
             {project.ideas.length ? (
               <ol className="st-ideas">
-                {project.ideas.map((idea, i) => <IdeaCard key={idea.id} idea={idea} index={i} />)}
+                {project.ideas.map((idea, i) => (
+                  <IdeaCard key={idea.id} idea={idea} index={i} form={`estimate-${project.id}`} />
+                ))}
               </ol>
             ) : (
-              <p className="st-muted">No ideas have been added to this project yet.</p>
+              <p className="st-muted">No ideas on this project yet. Add yours below.</p>
             )}
+
+            {/* Keyed by the idea count so the fields clear once an idea is added. */}
+            <details key={project.ideas.length} className="st-add-idea" open={!project.ideas.length}>
+              <summary>Add an idea</summary>
+              <form action={addAction}>
+                <input type="hidden" name="project" value={project.id} />
+                <label>
+                  Short name
+                  <input name="title" type="text" required maxLength={120} placeholder="Mascot opens the shop" />
+                </label>
+                <label>
+                  What happens in the video
+                  <textarea
+                    name="what"
+                    rows={4}
+                    required
+                    maxLength={6000}
+                    placeholder="What we see, how long it runs, the style, and how we would make it."
+                  />
+                </label>
+                <label className="st-idea-estimate">
+                  Your cost to make it (USD)
+                  <input name="cost" type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00" />
+                </label>
+                <div className="st-estimate-foot">
+                  <SubmitButton className="st-btn" pendingLabel="Adding…">Add idea</SubmitButton>
+                  <span className="st-muted st-small">Add ideas first: adding one reloads the page.</span>
+                </div>
+              </form>
+            </details>
+          </div>
+
+          <form id={`estimate-${project.id}`} action={action} className="st-estimate">
+            <input type="hidden" name="project" value={project.id} />
             <label>
               Notes for Daniel
               <textarea

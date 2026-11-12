@@ -15,7 +15,7 @@ import {
 } from "@/lib/studio/auth";
 import { getTimezone, isUuid, one, q } from "@/lib/studio/db";
 import { parseFilters, whereOf } from "@/lib/studio/filters";
-import { sendEstimate } from "@/lib/studio/proposals";
+import { addIdea, sendEstimate } from "@/lib/studio/proposals";
 import { fetchTaskPage, matchComfy, repriceUnpriced, syncAll } from "@/lib/studio/sync";
 import { importKeyUsage, priceKeyUsage } from "@/lib/studio/usage";
 
@@ -214,6 +214,31 @@ export async function sendCostEstimate(fd: FormData) {
   }
   done();
   redirect(`/studio/clients?sent=${encodeURIComponent(name)}`);
+}
+
+export async function addTeamIdea(fd: FormData) {
+  const user = await requireUser();
+  const project = text(fd, "project");
+  if (!isUuid(project)) fail("/studio/clients", "That project wasn't found.");
+  const title = text(fd, "title").slice(0, 120);
+  const what = text(fd, "what").slice(0, 6000);
+  if (!title || !what) fail("/studio/clients", "An idea needs a short name and a description.");
+
+  const raw = text(fd, "cost");
+  const cost = raw === "" ? null : Number(raw);
+  if (cost !== null && (!Number.isFinite(cost) || cost < 0 || cost > 10_000_000)) {
+    fail("/studio/clients", "The cost isn't a number.");
+  }
+
+  let name = "";
+  try {
+    name = await addIdea(user, project, { title, what, cost: cost === null ? null : Math.round(cost * 100) / 100 });
+  } catch (err) {
+    console.error("[studio/clients] idea not added:", err);
+    fail("/studio/clients", err instanceof Error ? err.message : "Notion didn't accept the idea. Try again.");
+  }
+  done();
+  redirect(`/studio/clients?added=${encodeURIComponent(name)}`);
 }
 
 // ── Usage by API key (admin) ───────────────────────────────────────────────

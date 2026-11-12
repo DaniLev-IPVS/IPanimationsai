@@ -3,7 +3,8 @@ import type { StudioUser } from "./auth";
 /**
  * The Proposal Board in Notion, read and written straight from the studio.
  *
- * A lead in planning ("Pitch Booked" or "Create Estimate") becomes a Project
+ * A lead in planning ("Pitch Booked", "Interested for info" or "Create
+ * Estimate") becomes a Project
  * row (the intake cron does that). Daniel adds Idea rows under it, then sets the project to
  * "Team check / Estimate" and picks who it's for in "Assigned to". That is what
  * puts it on /studio/clients. Sending the cost estimate from there writes the
@@ -239,7 +240,46 @@ export async function loadBoard(user: StudioUser): Promise<{ waiting: Project[];
   return { waiting, sent };
 }
 
-// ── The cost estimate button ───────────────────────────────────────────────
+// ── The team's side: add an idea, send the cost estimate ───────────────────
+
+/** The project, once it's certain this person may write to it right now. */
+async function waitingProject(user: StudioUser, projectId: string): Promise<Project> {
+  const page: NotionPage = await notion(`pages/${projectId}`, "GET");
+  if (!sameId(String(page.parent?.data_source_id ?? ""), BOARD) || page.properties.Type?.select?.name !== "Project") {
+    throw new NotionError("That project isn't on the proposal board.");
+  }
+  const project = projectOf(page);
+  if (!canSee(user, project)) throw new NotionError("That project isn't assigned to you.");
+  if (project.status !== STATUS.teamCheck) {
+    throw new NotionError(`${project.name} is no longer waiting for a cost estimate.`);
+  }
+  return project;
+}
+
+/**
+ * The team's own idea for the video, as a new Idea row under the project:
+ * what it is and what it costs to make. The price to the client stays empty
+ * for Daniel.
+ */
+export async function addIdea(
+  user: StudioUser,
+  projectId: string,
+  idea: { title: string; what: string; cost: number | null },
+): Promise<string> {
+  const project = await waitingProject(user, projectId);
+  const existing = (await ideasFor([project.id])).get(project.id) ?? [];
+  await notion("pages", "POST", {
+    parent: { type: "data_source_id", data_source_id: BOARD },
+    properties: {
+      Name: { title: richText(`Idea ${existing.length + 1} — ${idea.title}`) },
+      Type: { select: { name: "Idea" } },
+      Project: { relation: [{ id: project.id }] },
+      "The idea": { rich_text: richText(idea.what) },
+      ...(idea.cost !== null && { "Team cost estimate": { number: idea.cost } }),
+    },
+  });
+  return project.name;
+}
 
 /**
  * Writes the team's numbers to Notion and hands the project back to Daniel.
@@ -252,16 +292,7 @@ export async function sendEstimate(
   costs: Record<string, number>,
   notes: string,
 ): Promise<string> {
-  const page: NotionPage = await notion(`pages/${projectId}`, "GET");
-  if (!sameId(String(page.parent?.data_source_id ?? ""), BOARD) || page.properties.Type?.select?.name !== "Project") {
-    throw new NotionError("That project isn't on the proposal board.");
-  }
-  const project = projectOf(page);
-  if (!canSee(user, project)) throw new NotionError("That project isn't assigned to you.");
-  if (project.status !== STATUS.teamCheck) {
-    throw new NotionError(`${project.name} is no longer waiting for a cost estimate.`);
-  }
-
+  const project = await waitingProject(user, projectId);
   const ideas = (await ideasFor([project.id])).get(project.id) ?? [];
   for (const idea of ideas) {
     const cost = costs[idea.id];
@@ -283,9 +314,10 @@ export async function sendEstimate(
 
 // ── Intake: a lead in planning gets its project row ────────────────────────
 
-// Planning starts when the pitch is booked. Create Estimate stays on the list
-// for a lead that skips straight to it.
-const PLANNING = ["Pitch Booked", "Create Estimate"];
+// Planning starts when the pitch is booked or the lead asks for more. Create
+// Estimate stays on the list for a lead that skips straight to it. The board's
+// "Lead stage" rollup shows which of the three a project came from.
+const PLANNING = ["Pitch Booked", "Interested for info", "Create Estimate"];
 
 type NewProject = { lead: string; name: string };
 
