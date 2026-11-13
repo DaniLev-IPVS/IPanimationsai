@@ -127,12 +127,13 @@ function fields(project: Project): { read: () => string[]; write: (values: strin
   slot(project, "needs");
   slot(project, "why");
   slot(project, "usedFor");
-  slot(project, "budget");
   list(project.notes);
+  project.images.forEach((picture) => slot(picture, "caption"));
   for (const idea of project.ideas) {
     slot(idea, "name");
     slot(idea, "idea");
     list(idea.details);
+    idea.script.forEach(list);
   }
   return {
     read: () => slots.map((s) => s.get()),

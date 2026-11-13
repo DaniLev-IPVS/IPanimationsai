@@ -268,6 +268,13 @@
 .st-drop-client > summary { padding: 16px 18px; font-size: 17px; }
 .st-drop-client > .st-drop-body { padding: 2px 18px 18px; }
 .st-drop-quiet { border-style: dashed; }
+.st-brief dd:has(.st-gallery) { max-width: none; }
+.st-gallery { margin: 4px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.st-gallery li { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.st-gallery a { display: block; border: 1px solid var(--line-light); border-radius: 8px; overflow: hidden; background: #fff; }
+.st-gallery img { display: block; width: 100%; height: 130px; object-fit: contain; }
+.st-script td { vertical-align: top; white-space: pre-wrap; overflow-wrap: anywhere; }
+.st-script td:last-child, .st-script th:last-child { white-space: nowrap; width: 1%; }
 .st-estimate-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding-top: 12px; border-top: 1px solid var(--line-light); }
 .st-estimate-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
 .st-estimate-row label, .st-estimate-seconds { flex: 0 1 190px; max-width: 220px; }

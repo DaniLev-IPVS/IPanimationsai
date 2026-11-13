@@ -13,10 +13,22 @@ const estimateOf = (idea: Idea, { L, lang }: Words) =>
     ? `${fill(L.rangeTo, { low: money(idea.teamLow!), high: money(idea.teamHigh!) })} · ${daysLabel(lang, idea.teamDays!)}`
     : "";
 
+/** A line of plain text, with any web address in it turned into a link. */
+function Linked({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s)]+)/g);
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 ? <a key={i} href={part} target="_blank" rel="noreferrer">{part}</a> : part,
+      )}
+    </>
+  );
+}
+
 function Lines({ lines }: { lines: string[] }) {
   return (
     <div className="st-brief-notes">
-      {lines.map((line, i) => <p key={i}>{line}</p>)}
+      {lines.map((line, i) => <p key={i}><Linked text={line} /></p>)}
     </div>
   );
 }
@@ -59,10 +71,27 @@ function IdeaDrop({ project, idea, action, words }: { project: Project; idea: Id
       </summary>
       <div className="st-drop-body">
         {idea.idea ? <p className="st-drop-text">{idea.idea}</p> : <p className="st-muted">{L.noSummary}</p>}
-        {idea.details.length ? (
+        {idea.script.length || idea.details.length ? (
           <details className="st-drop st-drop-quiet">
             <summary><span className="st-drop-title">{L.fullScript}</span></summary>
-            <div className="st-drop-body"><Lines lines={idea.details} /></div>
+            <div className="st-drop-body">
+              <p className="st-note">{L.scriptNote}</p>
+              {idea.script.length ? (
+                <div className="st-table-wrap">
+                  <table className="st-table st-script">
+                    <thead>
+                      <tr>{idea.script[0].map((cell, i) => <th key={i}>{cell}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {idea.script.slice(1).map((row, r) => (
+                        <tr key={r}>{row.map((cell, i) => <td key={i}>{cell}</td>)}</tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+              {idea.details.length ? <Lines lines={idea.details} /> : null}
+            </div>
           </details>
         ) : null}
         <form action={action} className="st-estimate-form">
@@ -100,9 +129,9 @@ function ClientDrop({
     [L.needs, project.needs],
     [L.why, project.why],
     [L.usedFor, project.usedFor],
-    [L.budget, project.budget],
-    [L.quoted, project.quoted === null ? "" : usd(project.quoted)],
   ];
+  // The client's budget and what we quoted stay in Notion: the team prices the
+  // work without them.
   const filled = wants.filter(([, value]) => value);
   const estimated = project.ideas.filter(isEstimated).length;
   return (
@@ -135,7 +164,7 @@ function ClientDrop({
         <details className="st-drop">
           <summary><span className="st-drop-title">{L.wants}</span></summary>
           <div className="st-drop-body">
-            {filled.length ? (
+            {filled.length || project.website || project.images.length ? (
               <dl className="st-brief">
                 {filled.map(([label, value]) => (
                   <div key={label}>
@@ -143,6 +172,35 @@ function ClientDrop({
                     <dd>{value}</dd>
                   </div>
                 ))}
+                {project.website ? (
+                  <div>
+                    <dt>{L.website}</dt>
+                    <dd>
+                      <a href={project.website} target="_blank" rel="noreferrer">
+                        {project.website.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "")}
+                      </a>
+                    </dd>
+                  </div>
+                ) : null}
+                {project.images.length ? (
+                  <div>
+                    <dt>{L.images}</dt>
+                    <dd>
+                      <ul className="st-gallery">
+                        {project.images.map((picture) => (
+                          <li key={picture.url}>
+                            <a href={picture.url} target="_blank" rel="noreferrer">
+                              {/* Plain img: these come from the client's own site or from Notion. */}
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={picture.url} alt={picture.caption} loading="lazy" referrerPolicy="no-referrer" />
+                            </a>
+                            {picture.caption ? <span className="st-small st-muted">{picture.caption}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
             ) : (
               <p className="st-muted">{L.notWritten}</p>

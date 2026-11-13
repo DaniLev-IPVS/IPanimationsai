@@ -43,14 +43,18 @@ export type Idea = {
   teamLow: number | null;
   teamHigh: number | null;
   teamDays: number | null;
-  /** The body of the idea's Notion page (a script, usually), as plain lines. */
+  /** Any plain text in the body of the idea's Notion page. */
   details: string[];
+  /** The concept script: the first table in the idea's Notion page, header row first. */
+  script: string[][];
 };
 
 export type Estimate = { low: number; high: number; days: number };
 
 export const isEstimated = (idea: Pick<Idea, "teamLow" | "teamHigh" | "teamDays">) =>
   idea.teamLow !== null && idea.teamHigh !== null && idea.teamDays !== null;
+
+export type Picture = { url: string; caption: string };
 
 export type Project = {
   id: string;
@@ -59,6 +63,7 @@ export type Project = {
   status: string;
   assignedTo: string[];
   who: string;
+  website: string;
   needs: string;
   why: string;
   usedFor: string;
@@ -70,6 +75,8 @@ export type Project = {
   checkedAt: string | null;
   checkedBy: string;
   notes: string[];
+  /** Pictures placed in the body of the project's Notion page, e.g. from the client's site. */
+  images: Picture[];
   ideas: Idea[];
 };
 
@@ -116,6 +123,8 @@ export async function queryAll(dataSource: string, filter: unknown, sorts?: unkn
 export const plain = (prop: any): string =>
   (prop?.title ?? prop?.rich_text ?? []).map((t: any) => t.plain_text).join("").trim();
 const numberOf = (prop: any): number | null => (typeof prop?.number === "number" ? prop.number : null);
+/** Only real web links get through; anything else in the cell is dropped. */
+const webUrl = (value: unknown): string => (typeof value === "string" && /^https?:\/\//i.test(value.trim()) ? value.trim() : "");
 const sameId = (a: string, b: string) => a.replace(/-/g, "").toLowerCase() === b.replace(/-/g, "").toLowerCase();
 
 /** Notion caps one text object at 2,000 characters, so long text goes in as several. */
@@ -136,6 +145,7 @@ function projectOf(page: NotionPage): Project {
     status: p.Status?.status?.name ?? "",
     assignedTo: (p["Assigned to"]?.multi_select ?? []).map((o: any) => String(o.name)),
     who: plain(p["Who the client is"]),
+    website: webUrl(p.Website?.url),
     needs: plain(p["Client needs"]),
     why: plain(p["Why they need it"]),
     usedFor: plain(p["What it is for"]),
@@ -147,6 +157,7 @@ function projectOf(page: NotionPage): Project {
     checkedAt: p["Team checked"]?.date?.start ?? null,
     checkedBy: plain(p["Team checked by"]),
     notes: [],
+    images: [],
     ideas: [],
   };
 }
@@ -166,6 +177,7 @@ function ideaOf(page: NotionPage): Idea {
     teamHigh: numberOf(p["Team cost high"]),
     teamDays: numberOf(p["Team days"]),
     details: [],
+    script: [],
   };
 }
 
@@ -209,19 +221,38 @@ const TEXT_BLOCKS = [
   "numbered_list_item", "to_do", "quote", "callout",
 ];
 
-/** Whatever is typed in the body of a Notion page (project or idea), as plain lines. */
-async function pageNotes(pageId: string): Promise<string[]> {
+/**
+ * The body of a Notion page (project or idea): its text as plain lines, and
+ * the pictures in it. A picture uploaded to Notion comes with a link that
+ * expires within the hour, which is fine here because the page is read fresh
+ * on every visit.
+ */
+async function pageBody(pageId: string): Promise<{ lines: string[]; images: Picture[]; table: string[][] }> {
   try {
     const res = await notion(`blocks/${pageId}/children?page_size=100`, "GET");
-    return (res.results as any[])
+    const blocks = res.results as any[];
+    const text = (rich: any[] | undefined) => (rich ?? []).map((t: any) => t.plain_text).join("").trim();
+    const lines = blocks
       .filter((b) => TEXT_BLOCKS.includes(b.type))
       .map((b) => {
-        const text = (b[b.type]?.rich_text ?? []).map((t: any) => t.plain_text).join("").trim();
-        return text && b.type.endsWith("list_item") ? `• ${text}` : text;
+        const line = text(b[b.type]?.rich_text);
+        return line && b.type.endsWith("list_item") ? `• ${line}` : line;
       })
       .filter(Boolean);
+    const images = blocks
+      .filter((b) => b.type === "image")
+      .map((b) => ({ url: webUrl(b.image?.external?.url ?? b.image?.file?.url), caption: text(b.image?.caption) }))
+      .filter((picture) => picture.url);
+    // A table's rows are its children, so the first table costs one more request.
+    const first = blocks.find((b) => b.type === "table");
+    const table: string[][] = first
+      ? ((await notion(`blocks/${first.id}/children?page_size=100`, "GET")).results as any[])
+          .filter((row) => row.type === "table_row")
+          .map((row) => (row.table_row?.cells ?? []).map((cell: any[]) => text(cell)))
+      : [];
+    return { lines, images, table };
   } catch {
-    return []; // The brief still shows without the free-form notes.
+    return { lines: [], images: [], table: [] }; // The brief still shows without the free-form notes.
   }
 }
 
@@ -249,22 +280,24 @@ export async function loadBoard(user: StudioUser): Promise<{ waiting: Project[];
     .sort((a, b) => String(b.checkedAt).localeCompare(String(a.checkedAt)))
     .slice(0, 10);
 
-  const [ideas, notes] = await Promise.all([
+  const [ideas, bodies] = await Promise.all([
     ideasFor([...waiting, ...sent].map((p) => p.id)),
-    Promise.all(waiting.map((p) => pageNotes(p.id))),
+    Promise.all(waiting.map((p) => pageBody(p.id))),
   ]);
   waiting.forEach((p, i) => {
     p.ideas = ideas.get(p.id) ?? [];
-    p.notes = notes[i];
+    p.notes = bodies[i].lines;
+    p.images = bodies[i].images;
   });
   sent.forEach((p) => {
     p.ideas = ideas.get(p.id) ?? [];
   });
   // Each idea's own page holds its script; only the open projects need it.
   const open = waiting.flatMap((p) => p.ideas);
-  const details = await Promise.all(open.map((idea) => pageNotes(idea.id)));
+  const details = await Promise.all(open.map((idea) => pageBody(idea.id)));
   open.forEach((idea, i) => {
-    idea.details = details[i];
+    idea.details = details[i].lines;
+    idea.script = details[i].table;
   });
   return { waiting, sent };
 }
