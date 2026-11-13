@@ -149,6 +149,12 @@
 .st .st-seg a { padding: 5px 12px; border-radius: 8px; color: var(--ink-soft); font-weight: 600; font-size: 14px; }
 .st .st-seg a:hover { text-decoration: none; color: var(--ink); }
 .st .st-seg a[aria-current="true"] { background: #fff; color: var(--ink); }
+.st .st-seg button { padding: 5px 12px; border: 0; border-radius: 8px; background: none; color: var(--ink-soft); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
+.st .st-seg button:hover { color: var(--ink); }
+.st .st-seg button[aria-pressed="true"] { background: #fff; color: var(--ink); }
+.st .st-seg button:disabled { cursor: progress; opacity: 0.7; }
+.st-lang { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.st-lang-label { font-size: 13px; font-weight: 600; color: var(--st-muted); }
 .st-filter-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
 
 /* Totals */
@@ -307,3 +313,5 @@
   .st-drop-meta { margin-left: 17px; flex-basis: 100%; }
   .st-estimate-row label, .st-estimate-seconds { flex: 1 1 100%; max-width: none; }
 }
+
+.st-clients { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }

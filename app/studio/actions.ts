@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import {
   createSetupToken,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/studio/auth";
 import { getTimezone, isUuid, one, q } from "@/lib/studio/db";
 import { parseFilters, whereOf } from "@/lib/studio/filters";
+import { LANG_COOKIE, langOf } from "@/lib/studio/i18n";
 import { addIdea, submitEstimate, type Estimate, type Submitted } from "@/lib/studio/proposals";
 import { fetchTaskPage, matchComfy, repriceUnpriced, syncAll } from "@/lib/studio/sync";
 import { importKeyUsage, priceKeyUsage } from "@/lib/studio/usage";
@@ -184,6 +186,20 @@ export async function setVideoStatus(fd: FormData) {
   const status = text(fd, "status");
   if (!isUuid(id) || ["in_production", "delivered"].indexOf(status) < 0) return;
   await q(`update studio.videos set status = $2 where id = $1`, [id, status]);
+  done();
+}
+
+// ── Language ───────────────────────────────────────────────────────────────
+
+/** Remembers the language this person reads the studio in, on this browser. */
+export async function setStudioLang(lang: string) {
+  await requireUser();
+  cookies().set(LANG_COOKIE, langOf(lang), {
+    path: "/studio",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
   done();
 }
 

@@ -1,15 +1,17 @@
 import { usd } from "@/lib/studio/filters";
+import { DICT, LANGS, LOCALE, daysLabel, fill, type Dict, type Lang } from "@/lib/studio/i18n";
 import { isEstimated, type Idea, type Project } from "@/lib/studio/proposals";
-import { SubmitButton } from "../../ui";
+import { LangSwitch, SubmitButton } from "../../ui";
 
 type Action = (fd: FormData) => Promise<void>;
+/** The interface text and the language it is in, passed down to every part. */
+type Words = { L: Dict; lang: Lang };
 
-const day = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "–";
 const money = (n: number) => usd(n).replace(/\.00$/, "");
-const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
-const estimateOf = (idea: Idea) =>
-  isEstimated(idea) ? `${money(idea.teamLow!)} to ${money(idea.teamHigh!)} · ${days(idea.teamDays!)}` : "";
+const estimateOf = (idea: Idea, { L, lang }: Words) =>
+  isEstimated(idea)
+    ? `${fill(L.rangeTo, { low: money(idea.teamLow!), high: money(idea.teamHigh!) })} · ${daysLabel(lang, idea.teamDays!)}`
+    : "";
 
 function Lines({ lines }: { lines: string[] }) {
   return (
@@ -20,55 +22,56 @@ function Lines({ lines }: { lines: string[] }) {
 }
 
 /** The three numbers the team gives for one video. */
-function EstimateFields({ idea }: { idea?: Idea }) {
+function EstimateFields({ idea, L }: { idea?: Idea; L: Dict }) {
   return (
     <div className="st-estimate-row">
       <label>
-        Cost to make it, from (USD)
-        <input name="low" type="number" inputMode="decimal" min="0" step="0.01" required defaultValue={idea?.teamLow ?? ""} placeholder="e.g. 800" />
+        {L.costFrom}
+        <input name="low" type="number" inputMode="decimal" min="0" step="0.01" required defaultValue={idea?.teamLow ?? ""} placeholder={fill(L.eg, { n: 800 })} />
       </label>
       <label>
-        To (USD)
-        <input name="high" type="number" inputMode="decimal" min="0" step="0.01" required defaultValue={idea?.teamHigh ?? ""} placeholder="e.g. 1200" />
+        {L.costTo}
+        <input name="high" type="number" inputMode="decimal" min="0" step="0.01" required defaultValue={idea?.teamHigh ?? ""} placeholder={fill(L.eg, { n: 1200 })} />
       </label>
       <label>
-        Working days to make it
-        <input name="days" type="number" inputMode="decimal" min="0.5" step="0.5" required defaultValue={idea?.teamDays ?? ""} placeholder="e.g. 10" />
+        {L.days}
+        <input name="days" type="number" inputMode="decimal" min="0.5" step="0.5" required defaultValue={idea?.teamDays ?? ""} placeholder={fill(L.eg, { n: 10 })} />
       </label>
     </div>
   );
 }
 
-function IdeaDrop({ project, idea, action }: { project: Project; idea: Idea; action: Action }) {
-  const estimate = estimateOf(idea);
+function IdeaDrop({ project, idea, action, words }: { project: Project; idea: Idea; action: Action; words: Words }) {
+  const { L } = words;
+  const estimate = estimateOf(idea, words);
   return (
     <details className="st-drop">
       <summary>
         <span className="st-drop-title">{idea.name}</span>
         <span className="st-drop-meta">
-          {idea.seconds !== null ? <span className="st-chip">{idea.seconds} sec</span> : null}
+          {idea.seconds !== null ? <span className="st-chip">{fill(L.seconds, { n: idea.seconds })}</span> : null}
           {estimate ? (
             <span className="st-chip st-chip-active">{estimate}</span>
           ) : (
-            <span className="st-chip st-chip-mid">Needs your estimate</span>
+            <span className="st-chip st-chip-mid">{L.needsEstimate}</span>
           )}
         </span>
       </summary>
       <div className="st-drop-body">
-        {idea.idea ? <p className="st-drop-text">{idea.idea}</p> : <p className="st-muted">No summary has been written for this idea yet.</p>}
+        {idea.idea ? <p className="st-drop-text">{idea.idea}</p> : <p className="st-muted">{L.noSummary}</p>}
         {idea.details.length ? (
           <details className="st-drop st-drop-quiet">
-            <summary><span className="st-drop-title">Full script</span></summary>
+            <summary><span className="st-drop-title">{L.fullScript}</span></summary>
             <div className="st-drop-body"><Lines lines={idea.details} /></div>
           </details>
         ) : null}
         <form action={action} className="st-estimate-form">
           <input type="hidden" name="project" value={project.id} />
           <input type="hidden" name="idea" value={idea.id} />
-          <EstimateFields idea={idea} />
+          <EstimateFields idea={idea} L={L} />
           <div>
-            <SubmitButton className="st-btn st-btn-primary" pendingLabel="Saving…">
-              {estimate ? "Update estimate" : "Submit estimate"}
+            <SubmitButton className="st-btn st-btn-primary" pendingLabel={L.saving}>
+              {estimate ? L.update : L.submit}
             </SubmitButton>
           </div>
         </form>
@@ -83,19 +86,22 @@ function ClientDrop({
   open,
   estimateAction,
   addAction,
+  words,
 }: {
   project: Project;
   isAdmin: boolean;
   open: boolean;
   estimateAction: Action;
   addAction: Action;
+  words: Words;
 }) {
+  const { L } = words;
   const wants: [string, string][] = [
-    ["What they need", project.needs],
-    ["Why they need it", project.why],
-    ["What it's for", project.usedFor],
-    ["Their budget", project.budget],
-    ["Quoted so far", project.quoted === null ? "" : usd(project.quoted)],
+    [L.needs, project.needs],
+    [L.why, project.why],
+    [L.usedFor, project.usedFor],
+    [L.budget, project.budget],
+    [L.quoted, project.quoted === null ? "" : usd(project.quoted)],
   ];
   const filled = wants.filter(([, value]) => value);
   const estimated = project.ideas.filter(isEstimated).length;
@@ -106,28 +112,28 @@ function ClientDrop({
         <span className="st-drop-meta">
           {isAdmin ? (
             project.assignedTo.length ? (
-              <span className="st-muted st-small">For {project.assignedTo.join(", ")}</span>
+              <span className="st-muted st-small">{fill(L.forPeople, { names: project.assignedTo.join(", ") })}</span>
             ) : (
-              <span className="st-chip st-chip-high">Not assigned to anyone</span>
+              <span className="st-chip st-chip-high">{L.notAssigned}</span>
             )
           ) : null}
           <span className={`st-chip ${project.ideas.length && estimated === project.ideas.length ? "st-chip-active" : ""}`}>
             {project.ideas.length
-              ? `${estimated} of ${project.ideas.length} estimated`
-              : "No ideas yet"}
+              ? fill(L.estimatedOf, { done: estimated, total: project.ideas.length })
+              : L.noIdeasYet}
           </span>
         </span>
       </summary>
       <div className="st-drop-body">
         <details className="st-drop">
-          <summary><span className="st-drop-title">Who the client is</span></summary>
+          <summary><span className="st-drop-title">{L.who}</span></summary>
           <div className="st-drop-body">
-            {project.who ? <p className="st-drop-text">{project.who}</p> : <p className="st-muted">Not written yet.</p>}
+            {project.who ? <p className="st-drop-text">{project.who}</p> : <p className="st-muted">{L.notWritten}</p>}
           </div>
         </details>
 
         <details className="st-drop">
-          <summary><span className="st-drop-title">What the client wants</span></summary>
+          <summary><span className="st-drop-title">{L.wants}</span></summary>
           <div className="st-drop-body">
             {filled.length ? (
               <dl className="st-brief">
@@ -139,11 +145,11 @@ function ClientDrop({
                 ))}
               </dl>
             ) : (
-              <p className="st-muted">Not written yet.</p>
+              <p className="st-muted">{L.notWritten}</p>
             )}
             {project.notes.length ? (
               <>
-                <h3 className="st-subhead">Notes from Daniel</h3>
+                <h3 className="st-subhead">{L.notes}</h3>
                 <Lines lines={project.notes} />
               </>
             ) : null}
@@ -152,42 +158,40 @@ function ClientDrop({
 
         <details className="st-drop" open={open}>
           <summary>
-            <span className="st-drop-title">Ideas to pitch</span>
+            <span className="st-drop-title">{L.ideas}</span>
             <span className="st-drop-meta"><span className="st-chip">{project.ideas.length}</span></span>
           </summary>
           <div className="st-drop-body">
             {project.ideas.length ? (
-              <p className="st-muted st-small">
-                Open each idea, give a cost range and the working days, and submit. When every idea has an estimate it goes back to Daniel by itself.
-              </p>
+              <p className="st-muted st-small">{L.ideasHint}</p>
             ) : (
-              <p className="st-muted">No ideas on this project yet. Add yours below.</p>
+              <p className="st-muted">{L.noIdeas}</p>
             )}
             {project.ideas.map((idea) => (
-              <IdeaDrop key={idea.id} project={project} idea={idea} action={estimateAction} />
+              <IdeaDrop key={idea.id} project={project} idea={idea} action={estimateAction} words={words} />
             ))}
 
             {/* Keyed by the idea count so the fields clear once an idea is added. */}
             <details key={project.ideas.length} className="st-drop st-drop-quiet">
-              <summary><span className="st-drop-title">Add an idea of your own</span></summary>
+              <summary><span className="st-drop-title">{L.addOwn}</span></summary>
               <div className="st-drop-body">
                 <form action={addAction} className="st-estimate-form">
                   <input type="hidden" name="project" value={project.id} />
                   <label>
-                    Short name
-                    <input name="title" type="text" required maxLength={120} placeholder="Mascot opens the shop" />
+                    {L.shortName}
+                    <input name="title" type="text" required maxLength={120} placeholder={L.shortNameHint} />
                   </label>
                   <label>
-                    What happens in the video
-                    <textarea name="what" rows={4} required maxLength={6000} placeholder="What we see, the style, and how we would make it." />
+                    {L.whatHappens}
+                    <textarea name="what" rows={4} required maxLength={6000} placeholder={L.whatHappensHint} />
                   </label>
                   <label className="st-estimate-seconds">
-                    Length in seconds
-                    <input name="seconds" type="number" inputMode="numeric" min="1" step="1" placeholder="e.g. 30" />
+                    {L.lengthSeconds}
+                    <input name="seconds" type="number" inputMode="numeric" min="1" step="1" placeholder={fill(L.eg, { n: 30 })} />
                   </label>
-                  <EstimateFields />
+                  <EstimateFields L={L} />
                   <div>
-                    <SubmitButton className="st-btn" pendingLabel="Adding…">Add idea</SubmitButton>
+                    <SubmitButton className="st-btn" pendingLabel={L.adding}>{L.addIdea}</SubmitButton>
                   </div>
                 </form>
               </div>
@@ -196,7 +200,7 @@ function ClientDrop({
         </details>
 
         {isAdmin ? (
-          <p className="st-small"><a href={project.url} target="_blank" rel="noreferrer">Open in Notion</a></p>
+          <p className="st-small"><a href={project.url} target="_blank" rel="noreferrer">{L.openInNotion}</a></p>
         ) : null}
       </div>
     </details>
@@ -205,6 +209,8 @@ function ClientDrop({
 
 export function ClientsView({
   isAdmin,
+  lang,
+  translated,
   board,
   problem,
   error,
@@ -213,8 +219,11 @@ export function ClientsView({
   open,
   estimateAction,
   addAction,
+  langAction,
 }: {
   isAdmin: boolean;
+  lang: Lang;
+  translated: boolean;
   board: { waiting: Project[]; sent: Project[] } | null;
   problem: string;
   error?: string;
@@ -223,34 +232,41 @@ export function ClientsView({
   open?: string;
   estimateAction: Action;
   addAction: Action;
+  langAction: (lang: string) => Promise<void>;
 }) {
+  const L = DICT[lang];
+  const words: Words = { L, lang };
+  const day = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString(LOCALE[lang], { month: "short", day: "numeric" }) : "–";
   return (
-    <>
+    <div lang={lang} className="st-clients">
       <div className="st-head">
         <div>
-          <h1>Potential clients</h1>
-          <p className="st-muted">
-            {isAdmin
-              ? "Every project set to Team check / Estimate in Notion, whoever it's assigned to."
-              : "Client requests Daniel sent you. Open one to see who the client is, what they want and the ideas, then estimate each idea."}
-          </p>
+          <h1>{L.title}</h1>
+          <p className="st-muted">{isAdmin ? L.introAdmin : L.introTeam}</p>
         </div>
+        <LangSwitch
+          current={lang}
+          langs={Object.entries(LANGS)}
+          label={L.translate}
+          busyLabel={L.translating}
+          action={langAction}
+        />
       </div>
 
       {error ? <p className="st-error" role="alert">{error}</p> : null}
-      {saved ? <p className="st-note" role="status">Estimate saved for {saved}.</p> : null}
-      {sent ? (
-        <p className="st-note" role="status">Every idea for {sent} has an estimate. It&apos;s back with Daniel.</p>
-      ) : null}
+      {!translated ? <p className="st-note" role="status">{L.translationFailed}</p> : null}
+      {saved ? <p className="st-note" role="status">{fill(L.saved, { name: saved })}</p> : null}
+      {sent ? <p className="st-note" role="status">{fill(L.sent, { name: sent })}</p> : null}
       {problem ? (
         <p className="st-error" role="alert">
-          Couldn&apos;t read the proposal board from Notion.{isAdmin ? ` ${problem}` : " Tell Daniel."}
+          {L.problem} {isAdmin ? problem : L.tellDaniel}
         </p>
       ) : null}
 
       {board && !board.waiting.length ? (
         <section className="st-card st-panel">
-          <p className="st-empty">No client requests are waiting for an estimate.</p>
+          <p className="st-empty">{L.empty}</p>
         </section>
       ) : null}
 
@@ -262,15 +278,16 @@ export function ClientsView({
           open={open === project.id}
           estimateAction={estimateAction}
           addAction={addAction}
+          words={words}
         />
       ))}
 
       {board?.sent.length ? (
         <section className="st-card st-panel">
-          <h2>Estimated</h2>
+          <h2>{L.estimated}</h2>
           <div className="st-table-wrap">
             <table className="st-table">
-              <thead><tr><th>Client request</th><th>Sent</th><th>By</th><th>Estimates</th></tr></thead>
+              <thead><tr><th>{L.colRequest}</th><th>{L.colSent}</th><th>{L.colBy}</th><th>{L.colEstimates}</th></tr></thead>
               <tbody>
                 {board.sent.map((p) => (
                   <tr key={p.id}>
@@ -280,7 +297,7 @@ export function ClientsView({
                     <td>
                       {p.ideas.filter(isEstimated).length
                         ? p.ideas.filter(isEstimated).map((idea) => (
-                            <div key={idea.id}>{idea.name}: {estimateOf(idea)}</div>
+                            <div key={idea.id}>{idea.name}: {estimateOf(idea, words)}</div>
                           ))
                         : p.teamNotes || "–"}
                     </td>
@@ -291,6 +308,6 @@ export function ClientsView({
           </div>
         </section>
       ) : null}
-    </>
+    </div>
   );
 }

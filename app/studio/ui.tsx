@@ -7,13 +7,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useTransition, type ReactNode } from "react";
 
-export function NavLinks() {
+export type NavLabels = { spend: string; projects: string; clients: string; settings: string };
+
+export function NavLinks({ labels }: { labels: NavLabels }) {
   const path = usePathname() || "";
   const items = [
-    { href: "/studio", label: "Spend", on: path === "/studio" },
-    { href: "/studio/projects", label: "Projects", on: path.startsWith("/studio/projects") },
-    { href: "/studio/clients", label: "Potential clients", on: path.startsWith("/studio/clients") },
-    { href: "/studio/settings", label: "Settings", on: path.startsWith("/studio/settings") },
+    { href: "/studio", label: labels.spend, on: path === "/studio" },
+    { href: "/studio/projects", label: labels.projects, on: path.startsWith("/studio/projects") },
+    { href: "/studio/clients", label: labels.clients, on: path.startsWith("/studio/clients") },
+    { href: "/studio/settings", label: labels.settings, on: path.startsWith("/studio/settings") },
   ];
   return (
     <nav className="st-nav" aria-label="Studio">
@@ -23,6 +25,51 @@ export function NavLinks() {
         </Link>
       ))}
     </nav>
+  );
+}
+
+/**
+ * The language buttons. Picking one saves it and re-renders the page in that
+ * language; the label says so while the translation is being fetched.
+ */
+export function LangSwitch({
+  current,
+  langs,
+  label,
+  busyLabel,
+  action,
+}: {
+  current: string;
+  langs: [code: string, name: string][];
+  label: string;
+  busyLabel: string;
+  action: (lang: string) => Promise<void>;
+}) {
+  const [pending, start] = useTransition();
+  const [picked, setPicked] = useState(current);
+  const shown = pending ? picked : current;
+  return (
+    <div className="st-lang" role="group" aria-label={label}>
+      <span className="st-lang-label" aria-live="polite">{pending ? busyLabel : label}</span>
+      <div className="st-seg">
+        {langs.map(([code, name]) => (
+          <button
+            key={code}
+            type="button"
+            lang={code}
+            aria-pressed={shown === code}
+            disabled={pending}
+            onClick={() => {
+              if (code === current) return;
+              setPicked(code);
+              start(() => action(code));
+            }}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

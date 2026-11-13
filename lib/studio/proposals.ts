@@ -202,9 +202,11 @@ async function ideasFor(projectIds: string[]): Promise<Map<string, Idea[]>> {
   return byProject;
 }
 
+// Toggles are left out on purpose: the full brief from the calls is kept in
+// one for Daniel, and the team only gets the short version.
 const TEXT_BLOCKS = [
   "paragraph", "heading_1", "heading_2", "heading_3", "bulleted_list_item",
-  "numbered_list_item", "to_do", "quote", "callout", "toggle",
+  "numbered_list_item", "to_do", "quote", "callout",
 ];
 
 /** Whatever is typed in the body of a Notion page (project or idea), as plain lines. */
